@@ -6,8 +6,12 @@ import Control.Effect.Error
 import Control.Effect.Lift
 import Control.Effect.Reader
 import Control.Effect.State
+import Control.Monad (unless)
 import Data.Kind (Type)
 import Data.Text (Text)
+import qualified Data.Text.IO as TIO
+import System.Exit
+import System.Info
 import qualified System.Posix.Signals as S
 
 -- FIXME use alex type for delimited loc
@@ -44,10 +48,10 @@ data PLZError = MkPLZError
 data LangStatic (env :: Type) (cmd :: Type) = MkLangStatic
   { name :: !Text
   , options :: ![(Text, Text, Text)]
-  , initialEnvironment :: !env
   , fileParser :: !(Maybe (Text -> [cmd]))
   , toplevelParser :: !(Maybe (Text -> cmd))
   , exec :: env -> cmd -> env
+  , printer :: env -> Text
   }
 
 data LangDynamic (env :: Type) = MkLangDynamic
@@ -70,10 +74,38 @@ usage = do
     Nothing -> ""
     Just _  -> " [file] ..."
 
+addFile :: forall env sig m. Has (State (LangDynamic env)) sig m => Bool -> Text -> m ()
+addFile interactive filename = do
+  x <- get @(LangDynamic env)
+  let fs' = (filename, interactive) : files x
+  put x -- FIXME
+
+anonymous :: forall env sig m. Has (State (LangDynamic env)) sig m => Text -> m ()
+anonymous str = do
+  -- addFile True str
+  -- FIXME
+  pure ()
+
+toplevel :: forall env cmd sig m. (Language env cmd sig m, Has (Lift IO) sig m) => env -> m ()
+toplevel ctx = do
+  let
+    eof = case os of
+      "linux" -> "Ctrl-D"
+      _       -> "EOF"
+  mtlp <- asks @(LangStatic env cmd) toplevelParser
+  case mtlp of
+    Nothing  -> sendIO $ print "No interactive toplevel" >> exitFailure
+    Just tlp -> do
+      languageName <- asks @(LangStatic env cmd) name
+      sendIO $ TIO.putStrLn $ languageName <> " -- programming languages zoo"
+      sendIO $ TIO.putStrLn $ "Type " <> eof <> " to exit."
+  pure ()
+
 mainPlan :: forall env cmd sig m. (Language env cmd sig m, Has (Lift IO) sig m) => m ()
 mainPlan = do
-  sendIO $ S.installHandler S.keyboardSignal (S.Catch $ pure ()) Nothing
-  x <- gets @(LangDynamic env) interactiveShell
-  languageName <- asks @(LangStatic env cmd) name
-  sendIO $ print languageName
-  pure ()
+  _ <- sendIO $ S.installHandler S.keyboardSignal (S.Catch $ pure ()) Nothing
+  interactive <- gets @(LangDynamic env) interactiveShell
+  unless interactive do
+    pure ()
+  initCtx <- gets @(LangDynamic env) environment
+  toplevel @env @cmd initCtx

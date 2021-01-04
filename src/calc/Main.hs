@@ -3,8 +3,12 @@ module Main where
 import Control.Carrier.Lift
 import Control.Carrier.Reader
 import Control.Carrier.State.Strict
+import Data.Either (fromRight)
+import qualified Data.Text as T
 
 import Eval
+import Lexer
+import Parser
 import Syntax
 import Zoo
 
@@ -12,10 +16,10 @@ calcStatic :: LangStatic (Maybe Integer) Exp
 calcStatic = MkLangStatic
   { name = "calc"
   , options = []
-  , initialEnvironment = Nothing
   , fileParser = Nothing
-  , toplevelParser = Nothing
-  , exec = const (Just . eval) -- \_ c -> Just (eval c)
+  , toplevelParser = Just (\s -> fromRight undefined $ runAlex (T.unpack s) calcToplevel)
+  , exec = const (Just . eval)
+  , printer = T.pack . show
   }
 
 calcDynamic :: LangDynamic (Maybe Integer)
