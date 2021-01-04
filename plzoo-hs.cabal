@@ -18,18 +18,37 @@ library
   exposed-modules:      Zoo
   other-modules:
   build-depends:        base >= 4.13 && <4.14
+                      , fused-effects
+                      , text
+                      , unix
   hs-source-dirs:       src
   default-language:     Haskell2010
-  default-extensions:
+  default-extensions:   AllowAmbiguousTypes
+                      , ConstraintKinds
+                      , DuplicateRecordFields
+                      , KindSignatures
+                      , OverloadedStrings
+                      , RecordWildCards
+                      , ScopedTypeVariables
+                      , TypeApplications
+                      , TypeFamilies
+  ghc-options:         -Wall
 
 executable calc
   main-is:             Main.hs
-  other-modules:       Lexer
+  other-modules:       Eval
+                     , Lexer
                      , Syntax
   build-depends:       array
                      , base >=4.13 && <4.14
+                     , fused-effects
+                     , plzoo-hs
+                     , text
   build-tool-depends:  alex:alex
   hs-source-dirs:      src/calc
   default-language:    Haskell2010
-  default-extensions:  QuasiQuotes
+  default-extensions:  OverloadedStrings
+                     , QuasiQuotes
                      , TemplateHaskell
+                     , TypeApplications
+  ghc-options:         -Wall
