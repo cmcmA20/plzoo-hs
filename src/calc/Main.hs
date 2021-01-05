@@ -26,7 +26,7 @@ calcStatic = MkLangStatic
   , fileParser = Nothing
   , toplevelParser = Just (\s -> fromRight (Numeral 0) $ runAlex (T.unpack s) calc) -- FIXME
   , exec = const (Just . eval)
-  , printer = showEnv }
+  , prettyPrinter = showEnv }
 
 calcDynamic :: LangDynamic Env
 calcDynamic = MkLangDynamic
