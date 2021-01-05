@@ -1,10 +1,8 @@
 module Main where
 
-import Control.Carrier.Error.Either
 import Control.Carrier.Lift
 import Control.Carrier.Reader
 import Control.Carrier.State.Strict
-import Control.Monad (void)
 import Data.Either (fromRight)
 import qualified Data.Text as T
 
@@ -19,7 +17,7 @@ calcStatic = MkLangStatic
   { name = "calc"
   , options = []
   , fileParser = Nothing
-  , toplevelParser = Just (\s -> fromRight undefined $ runAlex (T.unpack s) calcToplevel) -- FIXME
+  , toplevelParser = Just (\s -> fromRight (Numeral 0) $ runAlex (T.unpack s) calcToplevel) -- FIXME
   , exec = const (Just . eval)
   , printer = T.pack . show
   }
@@ -34,9 +32,7 @@ calcDynamic = MkLangDynamic
 
 main :: IO ()
 main
-  = void
-  $ runM
+  = runM
   . runReader calcStatic
   . evalState calcDynamic
-  . runError @PLZException
   $ mainPlan @(Maybe Integer) @Exp

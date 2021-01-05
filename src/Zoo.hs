@@ -2,7 +2,7 @@
 module Zoo where
 
 import Control.Algebra
-import Control.Effect.Error
+import Control.Effect.Exception
 import Control.Effect.Lift
 import Control.Effect.Reader
 import Control.Effect.State
@@ -15,6 +15,7 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import GHC.Generics
 import System.Info (os)
+import System.IO
 import qualified System.Posix.Signals as S
 
 -- FIXME use alex type for delimited loc
@@ -59,6 +60,7 @@ data PLZException = MkPLZException
   , ek  :: !ErrorKind
   , msg :: !Text }
   deriving Show
+instance Exception PLZException
 
 showPLZException :: PLZException -> Text
 showPLZException MkPLZException{..} = showErrorKind ek <>
@@ -66,8 +68,8 @@ showPLZException MkPLZException{..} = showErrorKind ek <>
     LNowhere      -> ": " <> msg
     LLocation _ _ -> " at " <> showLocation loc <> ": " <> msg
 
-raiseError :: Has (Throw PLZException) sig m => ErrorKind -> Location -> Text -> m a
-raiseError ek loc msg = throwError $ MkPLZException loc ek msg
+raiseError :: Has (Lift IO) sig m => ErrorKind -> Location -> Text -> m a
+raiseError ek loc msg = throwIO $ MkPLZException loc ek msg
 
 showWithParens :: Integer -> Integer -> (a -> Text) -> (a -> Text)
 showWithParens maxLevel atLevel p =
@@ -94,10 +96,13 @@ data LangDynamic (env :: Type) = MkLangDynamic
 type Language env cmd sig m =
   ( Has (Reader (LangStatic env cmd)) sig m
   , Has (State (LangDynamic env)) sig m
-  , Has (Error PLZException) sig m
+  , Has (Lift IO) sig m
   )
 
-usage :: forall env cmd sig m. Has (Reader (LangStatic env cmd)) sig m => m Text
+usage
+  :: forall env cmd sig m
+  .  Has (Reader (LangStatic env cmd)) sig m
+  => m Text
 usage = do
   fp <- asks @(LangStatic env cmd) fileParser
   ln <- asks @(LangStatic env cmd) name
@@ -105,22 +110,50 @@ usage = do
     Nothing -> ""
     Just _  -> " [file] ..."
 
-addFile :: forall env sig m. Has (State (LangDynamic env)) sig m => Bool -> Text -> m ()
+addFile
+  :: forall env sig m
+  .  Has (State (LangDynamic env)) sig m
+  => Bool
+  -> Text
+  -> m ()
 addFile interactive filename =
   modify @(LangDynamic env) (& #files %~ ( (filename, interactive) : ))
 
-anonymous :: forall env sig m. Has (State (LangDynamic env)) sig m => Text -> m ()
+anonymous
+  :: forall env sig m
+  .  Has (State (LangDynamic env)) sig m
+  => Text
+  -> m ()
 anonymous str = do
   addFile @env True str
   modify @(LangDynamic env) (& #interactiveShell .~ False)
 
-toplevel :: forall env cmd sig m. (Language env cmd sig m, Has (Lift IO) sig m) => env -> m ()
-toplevel ctx = do
+readToplevel
+  :: forall env cmd sig m
+  .  Language env cmd sig m
+  => (Text -> cmd)
+  -> m cmd
+readToplevel p = do
+  ln <- asks @(LangStatic env cmd) name
+  let
+    prompt = ln <> "> "
+    promptMore = T.replicate (T.length ln) " " <> "> "
+  sendIO $ TIO.putStr prompt
+  inp <- sendIO TIO.getLine
+  pure $ p inp
+
+toplevel
+  :: forall env cmd sig m
+  .  Language env cmd sig m
+  => m ()
+toplevel = do
   let
     eof = case os of
       "linux" -> "Ctrl-D"
       _       -> "EOF"
   mtlp <- asks @(LangStatic env cmd) toplevelParser
+  ex <- asks @(LangStatic env cmd) exec
+  pr <- asks @(LangStatic env cmd) printer
   case mtlp of
     Nothing  ->
       raiseError (EKOther "Toplevel") LNowhere "No parser"
@@ -128,15 +161,21 @@ toplevel ctx = do
       languageName <- asks @(LangStatic env cmd) name
       sendIO $ TIO.putStrLn $ languageName <> " -- programming languages zoo"
       sendIO $ TIO.putStrLn $ "Type " <> eof <> " to exit."
-      flip (catchError @PLZException) (const (pure ())) $ forever do
-        pure () -- FIXME
+      handle @PLZException (const (pure ())) $ forever do
+        c <- readToplevel @env tlp
+        modify @(LangDynamic env) (& #environment %~ \e -> ex e c)
+        res <- pr <$> gets @(LangDynamic env) environment
+        sendIO $ TIO.putStrLn res
   pure ()
 
-mainPlan :: forall env cmd sig m. (Language env cmd sig m, Has (Lift IO) sig m) => m ()
+mainPlan
+  :: forall env cmd sig m
+  .  Language env cmd sig m
+  => m ()
 mainPlan = do
   _ <- sendIO $ S.installHandler S.keyboardSignal (S.Catch $ pure ()) Nothing
+  sendIO $ hSetBuffering stdout NoBuffering
   interactive <- gets @(LangDynamic env) interactiveShell
   unless interactive do
     pure ()
-  initCtx <- gets @(LangDynamic env) environment
-  toplevel @env @cmd initCtx
+  toplevel @env @cmd
