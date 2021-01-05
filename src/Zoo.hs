@@ -6,19 +6,28 @@ import Control.Effect.Error
 import Control.Effect.Lift
 import Control.Effect.Reader
 import Control.Effect.State
-import Control.Monad (unless)
+import Control.Lens
+import Control.Monad (forever, unless)
+import Data.Generics.Labels ()
 import Data.Kind (Type)
 import Data.Text (Text)
+import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
-import System.Exit
-import System.Info
+import GHC.Generics
+import System.Info (os)
 import qualified System.Posix.Signals as S
 
 -- FIXME use alex type for delimited loc
 data Location
   = LNowhere -- No location
-  | LLocation Text Text -- Delimited location
-  deriving Show
+  | LLocation !Integer !Integer -- Delimited location (row, column) ?
+
+showLocation :: Location -> Text
+showLocation LNowhere        = "Unknown location"
+showLocation (LLocation r c) = "Row " <> T.pack (show r) <> ", Column " <> T.pack (show c)
+
+instance Show Location where
+  show = T.unpack . showLocation
 
 data Located (a :: Type) = MkLocated
   { content :: !a
@@ -33,37 +42,59 @@ data ErrorKind
   | EKType
   | EKCompile
   | EKRuntime
-  | EKUnknown !Text
-  deriving Show
+  | EKOther !Text
 
-data PLZError = MkPLZError
+showErrorKind :: ErrorKind -> Text
+showErrorKind EKSyntax    = "Syntax error"
+showErrorKind EKType      = "Type error"
+showErrorKind EKCompile   = "Compilation error"
+showErrorKind EKRuntime   = "Runtime error"
+showErrorKind (EKOther t) = t <> " error"
+
+instance Show ErrorKind where
+  show = T.unpack . showErrorKind
+
+data PLZException = MkPLZException
   { loc :: !Location
   , ek  :: !ErrorKind
   , msg :: !Text }
   deriving Show
 
--- raiseError :: ErrorKind -> Location -> a
--- raiseError ek loc = throw MkPLZError {msg = "", ..}
+showPLZException :: PLZException -> Text
+showPLZException MkPLZException{..} = showErrorKind ek <>
+  case loc of
+    LNowhere      -> ": " <> msg
+    LLocation _ _ -> " at " <> showLocation loc <> ": " <> msg
+
+raiseError :: Has (Throw PLZException) sig m => ErrorKind -> Location -> Text -> m a
+raiseError ek loc msg = throwError $ MkPLZException loc ek msg
+
+showWithParens :: Integer -> Integer -> (a -> Text) -> (a -> Text)
+showWithParens maxLevel atLevel p =
+  if maxLevel < atLevel
+     then \x -> "(" <> p x <> ")"
+     else p
 
 data LangStatic (env :: Type) (cmd :: Type) = MkLangStatic
-  { name :: !Text
-  , options :: ![(Text, Text, Text)]
-  , fileParser :: !(Maybe (Text -> [cmd]))
+  { name           :: !Text
+  , options        :: ![(Text, Text, Text)]
+  , fileParser     :: !(Maybe (Text -> [cmd]))
   , toplevelParser :: !(Maybe (Text -> cmd))
-  , exec :: env -> cmd -> env
-  , printer :: env -> Text
-  }
+  , exec           :: env -> cmd -> env
+  , printer        :: env -> Text }
+  deriving Generic
 
 data LangDynamic (env :: Type) = MkLangDynamic
-  { environment :: !env
+  { environment      :: !env
   , interactiveShell :: !Bool
-  , wrapper :: !(Maybe [Text])
-  , files :: ![(Text, Bool)]
-  }
+  , wrapper          :: !(Maybe [Text])
+  , files            :: ![(Text, Bool)] }
+  deriving Generic
 
 type Language env cmd sig m =
   ( Has (Reader (LangStatic env cmd)) sig m
   , Has (State (LangDynamic env)) sig m
+  , Has (Error PLZException) sig m
   )
 
 usage :: forall env cmd sig m. Has (Reader (LangStatic env cmd)) sig m => m Text
@@ -75,16 +106,13 @@ usage = do
     Just _  -> " [file] ..."
 
 addFile :: forall env sig m. Has (State (LangDynamic env)) sig m => Bool -> Text -> m ()
-addFile interactive filename = do
-  x <- get @(LangDynamic env)
-  let fs' = (filename, interactive) : files x
-  put x -- FIXME
+addFile interactive filename =
+  modify @(LangDynamic env) (& #files %~ ( (filename, interactive) : ))
 
 anonymous :: forall env sig m. Has (State (LangDynamic env)) sig m => Text -> m ()
 anonymous str = do
-  -- addFile True str
-  -- FIXME
-  pure ()
+  addFile @env True str
+  modify @(LangDynamic env) (& #interactiveShell .~ False)
 
 toplevel :: forall env cmd sig m. (Language env cmd sig m, Has (Lift IO) sig m) => env -> m ()
 toplevel ctx = do
@@ -94,11 +122,14 @@ toplevel ctx = do
       _       -> "EOF"
   mtlp <- asks @(LangStatic env cmd) toplevelParser
   case mtlp of
-    Nothing  -> sendIO $ print "No interactive toplevel" >> exitFailure
+    Nothing  ->
+      raiseError (EKOther "Toplevel") LNowhere "No parser"
     Just tlp -> do
       languageName <- asks @(LangStatic env cmd) name
       sendIO $ TIO.putStrLn $ languageName <> " -- programming languages zoo"
       sendIO $ TIO.putStrLn $ "Type " <> eof <> " to exit."
+      flip (catchError @PLZException) (const (pure ())) $ forever do
+        pure () -- FIXME
   pure ()
 
 mainPlan :: forall env cmd sig m. (Language env cmd sig m, Has (Lift IO) sig m) => m ()

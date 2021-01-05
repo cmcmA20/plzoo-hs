@@ -19,6 +19,8 @@ library
   other-modules:
   build-depends:        base >= 4.13 && <4.14
                       , fused-effects
+                      , generic-lens
+                      , lens
                       , text
                       , unix
   hs-source-dirs:       src
@@ -27,10 +29,13 @@ library
                       , BlockArguments
                       , ConstraintKinds
                       , DuplicateRecordFields
+                      , DeriveGeneric
                       , KindSignatures
+                      , OverloadedLabels
                       , OverloadedStrings
                       , RecordWildCards
                       , ScopedTypeVariables
+                      , TupleSections
                       , TypeApplications
                       , TypeFamilies
   ghc-options:         -Wall
