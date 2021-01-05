@@ -22,6 +22,7 @@ library
                       , fused-effects-exceptions
                       , generic-lens
                       , lens
+                      , optparse-applicative
                       , text
                       , unix
   hs-source-dirs:       src

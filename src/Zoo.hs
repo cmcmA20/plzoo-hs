@@ -8,15 +8,20 @@ import           Control.Effect.Lift
 import           Control.Effect.Reader
 import           Control.Effect.State
 import           Control.Lens
-import           Control.Monad (forever, unless)
+import           Control.Monad (forever, forM_, void, when)
 import           Data.Generics.Labels ()
 import           Data.Kind (Type)
 import           Data.Text (Text)
 import qualified Data.Text                       as T
 import qualified Data.Text.IO                    as TIO
 import           GHC.Generics
+import           Options.Applicative
+import           Prelude hiding (readFile)
+import qualified System.Environment              as S
+import qualified System.Exit                     as S
 import qualified System.Info                     as S
 import qualified System.IO                       as S
+import qualified System.Posix.Process            as S
 import qualified System.Posix.Signals            as S
 
 -- FIXME use alex type for delimited loc
@@ -99,6 +104,47 @@ showWithParens maxLevel atLevel p =
      then \x -> "(" <> p x <> ")"
      else p
 
+data Opts = MkOpts
+  { wrappers       :: !(Maybe [Text])
+  , noWrapper      :: !Bool
+  , nonInteractive :: !Bool
+  , onlyLangInfo   :: !Bool
+  , fileToLoad     :: ![Text] }
+  deriving (Generic, Show)
+
+parseOpts :: Parser Opts
+parseOpts = MkOpts
+  <$> optional (many (strOption ( long "wrapper"
+    <> metavar "WRAPPER"
+    <> help "Specify a command-line wrapper to be used (such as rlwrap or ledit)" )))
+  <*> switch (long "no-wrapper"
+    <> help "Do not use a command-line wrapper")
+  <*> switch (short 'n'
+    <> help "Do not run the interactive toplevel")
+  <*> switch (short 'v'
+    <> help "Print language information and exit")
+  <*> many (strOption (short 'l'
+    <> help "Load file into the initial environment"))
+
+applyOpts :: forall env cmd sig m. Language env cmd sig m => m ()
+applyOpts = do
+  o <- sendIO $ execParser fullOpts
+  when (o ^. #onlyLangInfo) do
+    ln <- asks @(LangStatic env cmd) name
+    sendIO $ TIO.putStrLn $ ln <> " (" <> T.pack S.os <> ")"
+    sendIO S.exitSuccess
+  modify @(LangDynamic env) (& #wrapper %~ (o ^. #wrappers <>))
+  when (o ^. #noWrapper) do
+    modify @(LangDynamic env) (& #wrapper .~ Nothing)
+  when (o ^. #nonInteractive) do
+    modify @(LangDynamic env) (& #interactiveShell .~ False)
+  where
+    fullOpts :: ParserInfo Opts
+    fullOpts = info (parseOpts <**> helper)
+      (  fullDesc
+      <> progDesc "exists s t. Lang s -> Lang t"
+      <> header "The Programming Languages Zoo" )
+
 data LangStatic (env :: Type) (cmd :: Type) = MkLangStatic
   { name           :: !Text
   , options        :: ![(Text, Text, Text)]
@@ -121,16 +167,17 @@ type Language env cmd sig m =
   , Has (Lift IO) sig m
   )
 
-usage
-  :: forall env cmd sig m
-  .  Has (Reader (LangStatic env cmd)) sig m
-  => m Text
-usage = do
-  fp <- asks @(LangStatic env cmd) fileParser
-  ln <- asks @(LangStatic env cmd) name
-  pure $ "Usage: " <> ln <> " [option] ..." <> case fp of
-    Nothing -> ""
-    Just _  -> " [file] ..."
+-- TODO show usage depending on target language parser
+-- usage
+--   :: forall env cmd sig m
+--   .  Language env cmd sig m
+--   => m Text
+-- usage = do
+--   fp <- asks @(LangStatic env cmd) fileParser
+--   ln <- T.pack <$> sendIO S.getProgName
+--   pure $ "Usage: " <> ln <> " [option] ..." <> case fp of
+--     Nothing -> ""
+--     Just _  -> " [file] ..."
 
 addFile
   :: forall env sig m
@@ -141,14 +188,25 @@ addFile
 addFile interactive filename =
   modify @(LangDynamic env) (& #files %~ ( (filename, interactive) : ))
 
+-- TODO use anonymous arguments
 anonymous
   :: forall env sig m
   .  Has (State (LangDynamic env)) sig m
   => Text
   -> m ()
-anonymous str = do
-  addFile @env True str
+anonymous t = do
+  addFile @env True t
   modify @(LangDynamic env) (& #interactiveShell .~ False)
+
+readFile
+  :: forall env cmd sig m
+  .  Language env cmd sig m
+  => (Text -> [cmd])
+  -> Text
+  -> m [cmd]
+readFile p filename = do
+  fc <- sendIO $ TIO.readFile $ T.unpack filename
+  pure $ p fc -- TODO catch IO errors here
 
 readToplevel
   :: forall env cmd sig m
@@ -158,7 +216,7 @@ readToplevel
 readToplevel p = do
   ln <- asks @(LangStatic env cmd) name
   let
-    prompt = ln <> "> "
+    prompt     = ln <> "> "
     promptMore = T.replicate (T.length ln) " " <> "> "
   sendIO $ TIO.putStr prompt
   inp <- sendIO $ getMultiline promptMore
@@ -173,10 +231,17 @@ readToplevel p = do
              (T.init inp <>) <$> getMultiline pm
            else pure inp
 
-eofMarker :: Text
-eofMarker = case S.os of
-  "linux" -> "Ctrl-D"
-  _       -> "EOF"
+useFile
+  :: forall env cmd sig m
+  .  Language env cmd sig m
+  => (Text, Bool)
+  -> m ()
+useFile (filename, _) = do
+  flp <- asks @(LangStatic env cmd) fileParser >>= maybeRaiseInternalError "This language can't load files."
+  ex  <- asks @(LangStatic env cmd) exec
+  cs  <- readFile @env @cmd flp filename
+  forM_ cs \c -> do
+    modify @(LangDynamic env) (& #environment %~ \e -> ex e c)
 
 toplevel
   :: forall env cmd sig m
@@ -198,6 +263,11 @@ toplevel = do
         res <- pr <$> gets @(LangDynamic env) environment
         sendIO $ TIO.putStrLn res
     where
+      eofMarker :: Text
+      eofMarker = case S.os of
+        "linux" -> "Ctrl-D"
+        _       -> "EOF"
+
       handleUserInterrupt UserInterrupt = sendIO $ TIO.putStrLn "Interrupted."
       handleUserInterrupt e             = throwIO e
 
@@ -207,9 +277,18 @@ mainPlan
   => m ()
 mainPlan = do
   myTid <- sendIO S.myThreadId
-  _ <- sendIO $ S.installHandler S.keyboardSignal (S.Catch $ S.throwTo myTid UserInterrupt) Nothing
+  void $ sendIO $ S.installHandler S.keyboardSignal (S.Catch $ S.throwTo myTid UserInterrupt) Nothing
   sendIO $ S.hSetBuffering S.stdout S.NoBuffering
+  applyOpts @env @cmd
   interactive <- gets @(LangDynamic env) interactiveShell
-  unless interactive do
-    pure ()
-  toplevel @env @cmd
+  mwr <- gets @(LangDynamic env) wrapper
+  when interactive do
+    flip (maybe (pure ())) mwr \wrs -> do
+      myPath  <- sendIO S.getExecutablePath
+      newArgs <- (++ ["--no-wrapper"]) <$> sendIO S.getArgs
+      forM_ wrs \w ->
+        handle @IOError (const $ pure ()) $ void $ sendIO $
+          S.executeFile (T.unpack w) True (myPath : newArgs) Nothing
+  fs <- reverse <$> gets @(LangDynamic env) files
+  forM_ fs $ useFile @env @cmd -- TODO catch target language errors here
+  when interactive $ toplevel @env @cmd
