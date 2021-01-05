@@ -5,14 +5,13 @@ module Lexer where
 %wrapper "monad"
 
 $digit = 0-9
-$alpha = [a-zA-Z]
 
 tokens :-
 
   $white+ ;
   \n      { tok TNewline }
-  $digit+ { \(p,_,_,s) _ -> pure (TNumeral (read s)) }
-  \+      { tok TPlus }
+  $digit+ { \(_,_,_,s) len -> pure (TNumeral (read (take len s))) }
+  [\+]    { tok TPlus }
   \-      { tok TMinus }
   \*      { tok TTimes }
   \/      { tok TDivide }
@@ -33,7 +32,7 @@ data Token
   deriving (Eq, Show)
 
 tok :: Token -> AlexInput -> Int -> Alex Token
-tok t (p, _, _, s) _ = pure t
+tok t (_, _, _, _) _ = pure t
 
 alexEOF :: Alex Token
 alexEOF = pure TEOF

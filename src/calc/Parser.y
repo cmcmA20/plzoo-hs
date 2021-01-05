@@ -1,12 +1,10 @@
 {
 module Parser where
 
-import Control.Monad.Error
 import qualified Syntax as S
 import qualified Lexer as L
 }
 
-%name calcToplevel Toplevel
 %name calc Exp
 %error { parseError }
 %lexer { L.lexwrap } { L.TEOF }
@@ -28,10 +26,7 @@ eof    { L.TEOF        }
 
 %%
 
-Toplevel
-  : Exp eof { $1 }
-
-Exp
+Exp :: { S.Exp }
   : num { S.Numeral $1 }
   | Exp times Exp { S.Times $1 $3 }
   | Exp plus Exp { S.Plus $1 $3 }

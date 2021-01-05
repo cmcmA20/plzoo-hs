@@ -139,8 +139,17 @@ readToplevel p = do
     prompt = ln <> "> "
     promptMore = T.replicate (T.length ln) " " <> "> "
   sendIO $ TIO.putStr prompt
-  inp <- sendIO TIO.getLine
+  inp <- sendIO $ getMultiline promptMore
   pure $ p inp
+    where
+      getMultiline :: Text -> IO Text
+      getMultiline pm = do
+        inp <- TIO.getLine
+        if not (T.null inp) && T.last inp == '\\'
+           then do
+             TIO.putStr pm
+             (T.init inp <>) <$> getMultiline pm
+           else pure inp
 
 toplevel
   :: forall env cmd sig m
