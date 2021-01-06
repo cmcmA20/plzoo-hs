@@ -11,7 +11,7 @@ tokens :-
   $white+ ;
   \n      { tok TNewline }
   $digit+ { \(_,_,_,s) len -> pure (TNumeral (read (take len s))) }
-  [\+]    { tok TPlus }
+  \+      { tok TPlus }
   \-      { tok TMinus }
   \*      { tok TTimes }
   \/      { tok TDivide }
@@ -21,7 +21,7 @@ tokens :-
 {
 data Token
   = TNewline
-  | TNumeral Integer
+  | TNumeral !Integer
   | TPlus
   | TMinus
   | TTimes

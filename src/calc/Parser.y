@@ -19,10 +19,10 @@ times  { L.TTimes      }
 divide { L.TDivide     }
 lparen { L.TLParen     }
 rparen { L.TRParen     }
-eof    { L.TEOF        }
 
 %left plus minus
 %left times divide
+%nonassoc uminus
 
 %%
 
@@ -32,7 +32,7 @@ Exp :: { S.Exp }
   | Exp plus Exp { S.Plus $1 $3 }
   | Exp minus Exp { S.Minus $1 $3 }
   | Exp divide Exp { S.Divide $1 $3 }
-  | minus Exp { S.Negate $2 }
+  | minus Exp %prec uminus { S.Negate $2 }
   | lparen Exp rparen { $2 }
 
 {
