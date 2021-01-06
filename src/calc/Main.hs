@@ -1,36 +1,36 @@
 module Main where
 
-import Control.Carrier.Lift
-import Control.Carrier.Reader
-import Control.Carrier.State.Strict
-import Data.Text (Text)
-import qualified Data.Text as T
+import           Control.Carrier.Lift
+import           Control.Carrier.Reader
+import           Control.Carrier.State.Strict
+import           Data.Text (Text)
+import qualified Data.Text                    as T
 
-import Eval
-import Lexer
-import Parser
-import Syntax
-import Zoo
+import qualified Eval   as E
+import qualified Lexer  as L
+import qualified Parser as P
+import qualified Syntax as S
+import           Zoo
 
 type Env = Maybe Integer
 
 showEnv :: Env -> Text
 showEnv = foldMap $ T.pack . show
 
-top :: Text -> Exp
+top :: Text -> S.Exp
 top t =
-  let res = runAlex (T.unpack t) calc
+  let res = L.runAlex (T.unpack t) P.toplevel
    in case res of
      Left  err -> raiseErrorClassic EKSyntax LNowhere (T.pack err)
      Right x   -> x
 
-calcStatic :: LangStatic Env Exp
+calcStatic :: LangStatic Env S.Exp
 calcStatic = MkLangStatic
   { name = "calc"
   , options = []
   , fileParser = Nothing
   , toplevelParser = Just top
-  , exec = const (Just . eval)
+  , exec = const (Just . E.eval)
   , prettyPrinter = showEnv }
 
 calcDynamic :: LangDynamic Env
@@ -45,4 +45,4 @@ main
   = runM
   . runReader calcStatic
   . evalState calcDynamic
-  $ mainPlan @Env @Exp
+  $ mainPlan @Env @S.Exp

@@ -13,13 +13,16 @@ import qualified Lexer as L
 %tokentype { L.Token }
 
 %token
-num    { L.TNumeral $$ }
-plus   { L.TPlus       }
-minus  { L.TMinus      }
-times  { L.TTimes      }
-divide { L.TDivide     }
-lparen { L.TLParen     }
-rparen { L.TRParen     }
+num    { L.TNumeral $$  }
+var    { L.TVariable $$ }
+equal  { L.TEqual       }
+plus   { L.TPlus        }
+minus  { L.TMinus       }
+times  { L.TTimes       }
+divide { L.TDivide      }
+lparen { L.TLParen      }
+rparen { L.TRParen      }
+eof    { L.TEOF         }
 
 %left plus minus
 %left times divide
@@ -27,11 +30,13 @@ rparen { L.TRParen     }
 
 %%
 
-Toplevel :: { S.Exp }
-  : Exp { $1 }
+Toplevel :: {S.Cmd }
+  : Exp {S.Expression $1 }
+  | var equal Exp {S.Definition $1 $3 }
 
 Exp :: { S.Exp }
-  : num { S.Numeral $1 }
+  : var { S.Variable $1 }
+  | num { S.Numeral $1 }
   | Exp times Exp { S.Times $1 $3 }
   | Exp plus Exp { S.Plus $1 $3 }
   | Exp minus Exp { S.Minus $1 $3 }
