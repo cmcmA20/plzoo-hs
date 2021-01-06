@@ -10,7 +10,7 @@ license-file:        LICENSE.md
 author:              cmcmA20
 maintainer:          cmcmA20@pm.me
 -- copyright:
--- category:
+category:            Compilers/Interpreters, Education
 build-type:          Simple
 extra-source-files:  CHANGELOG.md, README.md
 
@@ -32,15 +32,12 @@ library
                       , ConstraintKinds
                       , DuplicateRecordFields
                       , DeriveGeneric
-                      , FlexibleContexts
                       , KindSignatures
                       , OverloadedLabels
                       , OverloadedStrings
                       , RecordWildCards
                       , ScopedTypeVariables
-                      , TupleSections
                       , TypeApplications
-                      , TypeFamilies
   ghc-options:         -Wall
 
 executable calc
@@ -52,7 +49,6 @@ executable calc
   build-depends:       array
                      , base >=4.13 && <4.14
                      , fused-effects
-                     , mtl
                      , plzoo-hs
                      , text
   build-tool-depends:  alex:alex
@@ -60,7 +56,5 @@ executable calc
   hs-source-dirs:      src/calc
   default-language:    Haskell2010
   default-extensions:  OverloadedStrings
-                     , QuasiQuotes
-                     , TemplateHaskell
                      , TypeApplications
   ghc-options:         -Wall
