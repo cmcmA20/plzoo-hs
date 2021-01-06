@@ -15,6 +15,7 @@ import           Data.Text (Text)
 import qualified Data.Text                       as T
 import qualified Data.Text.IO                    as TIO
 import           GHC.Generics
+import qualified GHC.IO.Exception                as S
 import           Options.Applicative
 import           Prelude hiding (readFile)
 import qualified System.Environment              as S
@@ -268,8 +269,9 @@ toplevel = do
     $  languageName <> " -- programming languages zoo\n"
     <> "Type " <> eofMarker <> " to exit."
   forever $ flip catches
-    [ Handler printError
-    , Handler handleUserInterrupt
+    [ Handler handleUserInterrupt
+    , Handler gracefulEOF
+    , Handler printError
     ] do
         c <- readToplevel @env tlp
         modify @(LangDynamic env) (& #environment %~ \e -> ex e c)
@@ -284,6 +286,12 @@ toplevel = do
     handleUserInterrupt :: AsyncException -> m ()
     handleUserInterrupt UserInterrupt = sendIO $ TIO.putStrLn "Interrupted."
     handleUserInterrupt e             = throwIO e
+
+    gracefulEOF :: IOError -> m ()
+    gracefulEOF ioe =
+      case S.ioe_type ioe of
+        S.EOF -> sendIO S.exitSuccess
+        _     -> throwIO ioe
 
 mainPlan
   :: forall env cmd sig m
