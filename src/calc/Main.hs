@@ -3,7 +3,6 @@ module Main where
 import Control.Carrier.Lift
 import Control.Carrier.Reader
 import Control.Carrier.State.Strict
-import Data.Either (fromRight)
 import Data.Text (Text)
 import qualified Data.Text as T
 
@@ -16,15 +15,21 @@ import Zoo
 type Env = Maybe Integer
 
 showEnv :: Env -> Text
-showEnv Nothing  = ""
-showEnv (Just i) = T.pack $ show i
+showEnv = foldMap $ T.pack . show
+
+top :: Text -> Exp
+top t =
+  let res = runAlex (T.unpack t) calc
+   in case res of
+     Left  err -> raiseErrorClassic EKSyntax LNowhere (T.pack err)
+     Right x   -> x
 
 calcStatic :: LangStatic Env Exp
 calcStatic = MkLangStatic
   { name = "calc"
   , options = []
   , fileParser = Nothing
-  , toplevelParser = Just (\s -> fromRight (Numeral 0) $ runAlex (T.unpack s) calc) -- FIXME
+  , toplevelParser = Just top
   , exec = const (Just . eval)
   , prettyPrinter = showEnv }
 

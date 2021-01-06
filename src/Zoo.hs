@@ -95,6 +95,9 @@ instance Exception PLZException
 raiseError :: Has (Lift IO) sig m => ErrorKind -> Location -> Text -> m a
 raiseError ek loc msg = throwIO $ MkPLZException loc ek msg
 
+raiseErrorClassic :: ErrorKind -> Location -> Text -> a
+raiseErrorClassic ek loc msg = throw $ MkPLZException loc ek msg
+
 printError :: Has (Lift IO) sig m => PLZException -> m ()
 printError = sendIO . TIO.putStrLn . showPLZE
 
@@ -131,8 +134,9 @@ applyOpts = do
   o <- sendIO $ execParser fullOpts
   when (o ^. #onlyLangInfo) do
     ln <- asks @(LangStatic env cmd) name
-    sendIO $ TIO.putStrLn $ ln <> " (" <> T.pack S.os <> ")"
-    sendIO S.exitSuccess
+    sendIO do
+      TIO.putStrLn $ ln <> " (" <> T.pack S.os <> ")"
+      S.exitSuccess
   modify @(LangDynamic env) (& #wrapper %~ (o ^. #wrappers <>))
   when (o ^. #noWrapper) do
     modify @(LangDynamic env) (& #wrapper .~ Nothing)
@@ -188,7 +192,7 @@ addFile
 addFile interactive filename =
   modify @(LangDynamic env) (& #files %~ ( (filename, interactive) : ))
 
--- TODO use anonymous arguments
+-- TODO use anonymous arguments?
 anonymous
   :: forall env sig m
   .  Has (State (LangDynamic env)) sig m
@@ -205,8 +209,14 @@ readFile
   -> Text
   -> m [cmd]
 readFile p filename = do
-  fc <- sendIO $ TIO.readFile $ T.unpack filename
-  pure $ p fc -- TODO catch IO errors here
+  fc <- handle dieOnIOError $ sendIO $ TIO.readFile $ T.unpack filename
+  handle discardBrokenFile $ pure $ p fc
+  where
+    dieOnIOError :: IOError -> m Text
+    dieOnIOError = raiseInternalError . T.pack . show
+
+    discardBrokenFile :: PLZException  -> m [cmd]
+    discardBrokenFile e = printError e >> pure []
 
 readToplevel
   :: forall env cmd sig m
@@ -221,15 +231,15 @@ readToplevel p = do
   sendIO $ TIO.putStr prompt
   inp <- sendIO $ getMultiline promptMore
   pure $ p inp
-    where
-      getMultiline :: Text -> IO Text
-      getMultiline pm = do
-        inp <- TIO.getLine
-        if not (T.null inp) && T.last inp == '\\'
-           then do
-             TIO.putStr pm
-             (T.init inp <>) <$> getMultiline pm
-           else pure inp
+  where
+    getMultiline :: Text -> IO Text
+    getMultiline pm = do
+      inp <- TIO.getLine
+      if not (T.null inp) && T.last inp == '\\'
+         then do
+           TIO.putStr pm
+           (T.init inp <>) <$> getMultiline pm
+         else pure inp
 
 useFile
   :: forall env cmd sig m
@@ -237,7 +247,8 @@ useFile
   => (Text, Bool)
   -> m ()
 useFile (filename, _) = do
-  flp <- asks @(LangStatic env cmd) fileParser >>= maybeRaiseInternalError "This language can't load files."
+  flp <- asks @(LangStatic env cmd) fileParser >>=
+    maybeRaiseInternalError "This language can't load files."
   ex  <- asks @(LangStatic env cmd) exec
   cs  <- readFile @env @cmd flp filename
   forM_ cs \c -> do
@@ -248,28 +259,31 @@ toplevel
   .  Language env cmd sig m
   => m ()
 toplevel = do
-  tlp <- asks @(LangStatic env cmd) toplevelParser >>= maybeRaiseInternalError "This language has no toplevel."
+  tlp <- asks @(LangStatic env cmd) toplevelParser >>=
+    maybeRaiseInternalError "This language has no toplevel."
   ex  <- asks @(LangStatic env cmd) exec
   pr  <- asks @(LangStatic env cmd) prettyPrinter
   languageName <- asks @(LangStatic env cmd) name
-  sendIO $ TIO.putStrLn $ languageName <> " -- programming languages zoo"
-  sendIO $ TIO.putStrLn $ "Type " <> eofMarker <> " to exit."
+  sendIO $ TIO.putStrLn
+    $  languageName <> " -- programming languages zoo\n"
+    <> "Type " <> eofMarker <> " to exit."
   forever $ flip catches
     [ Handler printError
-    , Handler (\(e :: AsyncException) -> handleUserInterrupt e)
+    , Handler handleUserInterrupt
     ] do
         c <- readToplevel @env tlp
         modify @(LangDynamic env) (& #environment %~ \e -> ex e c)
         res <- pr <$> gets @(LangDynamic env) environment
         sendIO $ TIO.putStrLn res
-    where
-      eofMarker :: Text
-      eofMarker = case S.os of
-        "linux" -> "Ctrl-D"
-        _       -> "EOF"
+  where
+    eofMarker :: Text
+    eofMarker = case S.os of
+      "linux" -> "Ctrl-D"
+      _       -> "EOF"
 
-      handleUserInterrupt UserInterrupt = sendIO $ TIO.putStrLn "Interrupted."
-      handleUserInterrupt e             = throwIO e
+    handleUserInterrupt :: AsyncException -> m ()
+    handleUserInterrupt UserInterrupt = sendIO $ TIO.putStrLn "Interrupted."
+    handleUserInterrupt e             = throwIO e
 
 mainPlan
   :: forall env cmd sig m
@@ -290,5 +304,5 @@ mainPlan = do
         handle @IOError (const $ pure ()) $ void $ sendIO $
           S.executeFile (T.unpack w) True (myPath : newArgs) Nothing
   fs <- reverse <$> gets @(LangDynamic env) files
-  forM_ fs $ useFile @env @cmd -- TODO catch target language errors here
+  handle printError $ forM_ fs $ useFile @env @cmd
   when interactive $ toplevel @env @cmd
