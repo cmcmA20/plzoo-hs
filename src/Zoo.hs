@@ -96,6 +96,11 @@ instance Exception PLZException
 raiseError :: Has (Lift IO) sig m => ErrorKind -> Location -> Text -> m a
 raiseError ek loc msg = throwIO $ MkPLZException loc ek msg
 
+-- TODO refactor all these uncertain error throws
+maybeRaiseError :: Has (Lift IO) sig m => ErrorKind -> Location -> Text -> Maybe a -> m a
+maybeRaiseError ek loc msg Nothing  = raiseError ek loc msg
+maybeRaiseError _  _   _   (Just v) = pure v
+
 raiseErrorClassic :: ErrorKind -> Location -> Text -> a
 raiseErrorClassic ek loc msg = throw $ MkPLZException loc ek msg
 

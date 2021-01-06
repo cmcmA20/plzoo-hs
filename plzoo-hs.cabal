@@ -58,3 +58,26 @@ executable calc
   default-extensions:  OverloadedStrings
                      , TypeApplications
   ghc-options:         -Wall
+
+executable calc_var
+  main-is:             Main.hs
+  other-modules:       Eval
+                     , Lexer
+                     , Parser
+                     , Syntax
+  build-depends:       array
+                     , base >=4.13 && <4.14
+                     , fused-effects
+                     , lens
+                     , plzoo-hs
+                     , text
+                     , unordered-containers
+  build-tool-depends:  alex:alex
+                     , happy:happy
+  hs-source-dirs:      src/calc_var
+  default-language:    Haskell2010
+  default-extensions:  DeriveGeneric
+                     , OverloadedLabels
+                     , OverloadedStrings
+                     , TypeApplications
+  ghc-options:         -Wall
