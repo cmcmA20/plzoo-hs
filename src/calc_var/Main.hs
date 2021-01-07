@@ -3,11 +3,9 @@ module Main where
 import           Control.Carrier.Lift
 import           Control.Carrier.Reader
 import           Control.Carrier.State.Strict
-import           Control.Lens
 import qualified Data.HashMap.Strict          as HM
 import           Data.Text (Text)
 import qualified Data.Text                    as T
-import           System.IO.Unsafe (unsafePerformIO)
 
 import qualified Eval   as E
 import qualified Lexer  as L
@@ -15,37 +13,24 @@ import qualified Parser as P
 import qualified Syntax as S
 import           Zoo
 
-showEnv :: E.Env -> Text
-showEnv = (^. #replResult . to (T.pack . show))
-
-top :: Text -> S.Cmd
+top :: Text -> Either SyntaxError S.Cmd
 top t =
   let res = L.runAlex (T.unpack t) P.toplevel
    in case res of
-     Left  err -> raiseErrorClassic EKSyntax LNowhere (T.pack err)
-     Right x   -> x
+     Left  err -> Left $ MkSyntaxError $ locate Nothing $ T.pack err
+     Right x   -> Right x
 
-ex :: (Has (State E.Env) sig m, Has (Lift IO) sig m ) => S.Cmd -> m ()
-ex (S.Expression e  ) = do
-  r <- E.eval e
-  modify @E.Env (& #replResult ?~ r)
-
-ex (S.Definition n e) = do
-  r <- E.eval e
-  modify @E.Env (& #context %~ HM.insert n r)
-
-static :: LangStatic E.Env S.Cmd
+static :: LangStatic E.Sem E.Ctx S.Cmd
 static = MkLangStatic
   { name = "calc_var"
   , options = []
   , fileParser = Nothing
   , toplevelParser = Just top
-  , exec = \e c -> unsafePerformIO $ runM $ execState e $ ex c
-  , prettyPrinter = showEnv }
+  , rts = liftToRTS E.eval' [] }
 
-dynamic :: LangDynamic E.Env
+dynamic :: LangDynamic E.Sem E.Ctx
 dynamic = MkLangDynamic
-  { environment = E.MkEnv {E.context = HM.empty, E.replResult = Nothing}
+  { environment = MkRuntimeEnv {context = HM.empty, replResult = Nothing}
   , interactiveShell = True
   , wrapper = Just ["rlwrap", "ledit"]
   , files = [] }
@@ -55,4 +40,4 @@ main
   = runM
   . runReader static
   . evalState dynamic
-  $ mainPlan @E.Env @S.Cmd
+  $ mainPlan @E.Sem @E.Ctx @S.Cmd

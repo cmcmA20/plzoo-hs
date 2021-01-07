@@ -12,6 +12,7 @@ import           Control.Lens
 import           Control.Monad (forever, forM_, void, when)
 import           Data.Generics.Labels ()
 import           Data.Kind (Type)
+import           Data.Maybe (fromMaybe)
 import           Data.Text (Text)
 import qualified Data.Text                       as T
 import qualified Data.Text.IO                    as TIO
@@ -80,8 +81,7 @@ newtype SyntaxError = MkSyntaxError { unSyntaxError :: Located Text }
 instance Show SyntaxError where
   show (MkSyntaxError (MkLocated m l)) = T.unpack $ showErr "Syntax error" l m
 
-printSyntaxError :: Has (Lift IO) sig m => SyntaxError -> m ()
-printSyntaxError = sendIO . TIO.putStrLn . T.pack . show
+instance Exception SyntaxError
 
 data LangError
   = LEType    !(Located Text)
@@ -93,8 +93,10 @@ instance Show LangError where
   show (LECompile (MkLocated m l)) = T.unpack $ showErr "Compile error" l m
   show (LERuntime (MkLocated m l)) = T.unpack $ showErr "Runtime error" l m
 
-printLangError :: Has (Lift IO) sig m => LangError -> m ()
-printLangError = sendIO . TIO.putStrLn . T.pack . show
+instance Exception LangError
+
+printError :: (Has (Lift IO) sig m, Exception e) => e -> m ()
+printError = sendIO . TIO.putStrLn . T.pack . show
 
 -- is it even needed?
 -- showWithParens :: Integer -> Integer -> (a -> Text) -> (a -> Text)
@@ -163,6 +165,9 @@ data RuntimeEnv (sem :: Type) (ctx :: Type) = MkRuntimeEnv
   , replResult :: !(Maybe sem) }
   deriving Generic
 
+type Evaluator (sem :: Type) (ctx :: Type) (cmd :: Type) =
+  ctx -> cmd -> (Either LangError sem, ctx)
+
 type RTS (sem :: Type) (ctx :: Type) (cmd :: Type) =
   RuntimeEnv sem ctx -> cmd -> (Either LangError (sem, RuntimeAction), RuntimeEnv sem ctx)
 
@@ -204,11 +209,18 @@ type Language sem ctx cmd sig m =
 
 {- Meta RTS -}
 
-liftExecutor
+-- feels wonky
+liftToRTS
   :: forall sem ctx cmd
-  .  (ctx -> cmd -> (Either LangError sem, ctx))
-  -> (RuntimeEnv sem ctx -> cmd -> (Either LangError (sem, RuntimeAction), RuntimeEnv sem ctx))
-liftExecutor = undefined
+  .  Eq sem
+  => Evaluator sem ctx cmd
+  -> [(sem, RuntimeAction)]
+  -> RTS sem ctx cmd
+liftToRTS ev acts = \env c ->
+  let (r, newCtx) = ev (env ^. #context) c
+   in case r of
+     Left  e -> (Left e, env & #context .~ newCtx)
+     Right x -> (Right (x, fromMaybe RANop (lookup x acts)), env & #context .~ newCtx)
 
 executeRuntimeAction
   :: Language sem ctx cmd sig m
@@ -229,7 +241,7 @@ runCommand c = do
   modify @(LangDynamic sem ctx) (& #environment .~ newEnv)
   case res of
     Left  le      -> do
-      printLangError le -- FIXME handle it higher
+      printError le -- FIXME handle it higher
       pure Nothing
     Right (e, ra) -> do
       executeRuntimeAction @sem @ctx @cmd ra
@@ -263,7 +275,7 @@ readFile
 readFile p filename = do
   fc <- handle dieOnIOError $ sendIO $ TIO.readFile $ T.unpack filename
   case p fc of
-    Left  se -> printSyntaxError se >> pure [] -- FIXME handle it higher
+    Left  se -> printError se >> pure [] -- FIXME handle it higher
     Right cs -> pure cs
   where
     dieOnIOError :: IOError -> m Text
@@ -283,7 +295,7 @@ readToplevel p = do
   inp <- sendIO $ getMultiline promptMore
   if not $ T.null inp
      then case p inp of
-       Left  se -> printSyntaxError se >> pure Nothing -- FIXME handle it higher
+       Left  se -> printError se >> pure Nothing -- FIXME handle it higher
        Right c  -> pure $ Just c
      else pure Nothing
   where
