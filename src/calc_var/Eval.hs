@@ -1,4 +1,4 @@
--- Evaluation of expressions
+-- | Evaluation of expressions
 module Eval where
 
 import           Control.Algebra
@@ -13,8 +13,10 @@ import           Data.Tuple (swap)
 import Syntax
 import Zoo
 
+-- | Semantics.
 type Sem = Integer
 
+-- | Context.
 type Ctx = HashMap Text Sem
 
 eval
