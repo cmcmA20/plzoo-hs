@@ -1,17 +1,23 @@
 -- Evaluation of expressions, given as big step semantics.
 module Eval where
 
+import Control.Applicative (liftA2)
+
 import Syntax
 import Zoo
 
-eval :: Exp -> Integer
-eval (Numeral n  ) = n
-eval (Plus    a b) = eval a + eval b
-eval (Minus   a b) = eval a - eval b
-eval (Times   a b) = eval a * eval b
-eval (Divide  a b) =
-  let y = eval b
-   in if y /= 0
-      then eval a `div` y
-      else raiseErrorClassic EKRuntime LNowhere "Division by zero"
-eval (Negate  a  ) = -(eval a)
+type Sem = Integer
+
+type Ctx = ()
+
+eval :: Cmd -> Either LangError Sem
+eval (Numeral n  ) = pure n
+eval (Plus    a b) = liftA2 (+) (eval a) (eval b)
+eval (Minus   a b) = liftA2 (-) (eval a) (eval b)
+eval (Times   a b) = liftA2 (*) (eval a) (eval b)
+eval (Divide  a b) = do
+  y <- eval b
+  if y /= 0
+     then liftA2 div (eval a) (pure y)
+     else Left $ LERuntime $ locate Nothing "Division by zero"
+eval (Negate  a  ) = negate <$> eval a
