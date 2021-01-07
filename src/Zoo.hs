@@ -75,11 +75,6 @@ showErr errName l m =
       LLocation _ _ -> " at " <> showLocation l
   in errName <> locText <> ": " <> m
 
--- newtype SyntaxError = MkSyntaxError { unSyntaxError :: Located Text }
-
--- instance Show SyntaxError where
---   show (MkSyntaxError (MkLocated m l)) = T.unpack $ showErr "Syntax error" l m
-
 data SyntaxError
   = SELex   !Location
   | SEParse !Location
@@ -197,9 +192,6 @@ data LangStatic (sem :: Type) (ctx :: Type) (cmd :: Type) = MkLangStatic
   , rts            :: !(RTS sem ctx cmd) }
   deriving Generic
 
--- simpleEval : ctx -> cmd -> (Either LangError sem, ctx)
--- realEval : RTE sem ctx -> cmd -> (Either LangError (sem, RuntimeAction), ctx)
-
 data LangDynamic (sem :: Type) (ctx :: Type) = MkLangDynamic
   { environment      :: !(RuntimeEnv sem ctx)
   , interactiveShell :: !Bool
@@ -247,8 +239,8 @@ executeRuntimeAction
   :: Language sem ctx cmd sig m
   => RuntimeAction
   -> m ()
-executeRuntimeAction RANop = pure ()
-executeRuntimeAction _     = throwIO $ MkInternalError "Not yet implemented"
+executeRuntimeAction RANop       = pure ()
+executeRuntimeAction (RAPrint t) = sendIO $ TIO.putStr t
 
 runCommand
   :: forall sem ctx cmd sig m

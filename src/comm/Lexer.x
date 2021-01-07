@@ -50,7 +50,7 @@ tokens :-
 {
 data Token
   = TNewline
-  | TNumeral !Integer
+  | TNumeral !Int
   | TTrue
   | TFalse
   | TSkip

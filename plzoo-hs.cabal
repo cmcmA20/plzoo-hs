@@ -91,13 +91,18 @@ executable comm
                      , Syntax
   build-depends:       array
                      , base >=4.13 && <4.14
+                     , containers
                      , fused-effects
+                     , lens
                      , plzoo-hs
                      , text
   build-tool-depends:  alex:alex
                      , happy:happy
   hs-source-dirs:      src/comm
   default-language:    Haskell2010
-  default-extensions:  OverloadedStrings
+  default-extensions:  DeriveGeneric
+                     , OverloadedLabels
+                     , OverloadedStrings
+                     , NamedFieldPuns
                      , TypeApplications
   ghc-options:         -Wall

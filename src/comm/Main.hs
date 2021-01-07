@@ -8,6 +8,7 @@ import qualified Data.Text as T
 
 import qualified Compile as C
 import qualified Lexer   as L
+import qualified Machine as M
 import qualified Parser  as P
 import qualified Syntax  as S
 import           Zoo
@@ -25,6 +26,8 @@ top t =
    in case res of
      Left  err -> Left $ alexErrorToSyntaxError err
      Right x   -> Right x
+
+qwe c = C.compile c
 
 static :: LangStatic C.Sem C.Ctx S.Cmd
 static = MkLangStatic

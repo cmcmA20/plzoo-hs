@@ -6,7 +6,7 @@ import Data.Text (Text)
 -- | Arithmetical expressions.
 data ArExp
   = AEVariable !Text -- ^ a variable
-  | AENumeral !Integer -- ^ integer constant
+  | AENumeral !Int -- ^ integer constant
   | AEPlus !ArExp !ArExp -- ^ addition [e1 + e2]
   | AEMinus !ArExp !ArExp -- ^ difference [e1 - e2]
   | AETimes !ArExp !ArExp -- ^ product [e1 * e2]
