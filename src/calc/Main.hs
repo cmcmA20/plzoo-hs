@@ -20,10 +20,10 @@ top t =
      Left  err -> Left $ MkSyntaxError $ locate Nothing $ T.pack err
      Right x   -> Right x
 
-ex :: RuntimeEnv E.Sem E.Ctx -> S.Cmd -> (Either LangError RuntimeAction, RuntimeEnv E.Sem E.Ctx)
+ex :: RuntimeEnv E.Sem E.Ctx -> S.Cmd -> (Either LangError (E.Sem, RuntimeAction), RuntimeEnv E.Sem E.Ctx)
 ex env cmd = case E.eval cmd of
   Left  le -> (Left le, env)
-  Right r  -> (Right RANop, env & #replResult .~ Just r)
+  Right r  -> (Right (r, RANop), env & #replResult .~ Just r)
 
 static :: LangStatic E.Sem E.Ctx S.Cmd
 static = MkLangStatic
@@ -31,7 +31,7 @@ static = MkLangStatic
   , options = []
   , fileParser = Nothing
   , toplevelParser = Just top
-  , exec = ex }
+  , rts = ex }
 
 dynamic :: LangDynamic E.Sem E.Ctx
 dynamic = MkLangDynamic
