@@ -3,6 +3,8 @@ module Main where
 import           Control.Carrier.Lift
 import           Control.Carrier.Reader
 import           Control.Carrier.State.Strict
+import           Control.Carrier.Throw.Either
+import           Data.Bifunctor (first)
 import           Data.Text (Text)
 import qualified Data.Text as T
 
@@ -27,17 +29,31 @@ top t =
      Left  err -> Left $ alexErrorToSyntaxError err
      Right x   -> Right x
 
-qwe c = C.compile c
+runMachine :: Evaluator M.Sem M.Ctx S.Cmd
+runMachine e c = (result, e)
+  where
+    translateErrors :: M.MachineError -> LangError
+    translateErrors = LERuntime . locate Nothing . T.pack . show
 
-static :: LangStatic C.Sem C.Ctx S.Cmd
+    result :: Either LangError M.Sem
+    result = do
+      is <- C.compile c
+      let blankMachine = M.mkMachineState is 64
+      first translateErrors $
+        run $ evalState blankMachine $ runThrow @M.MachineError M.runProgram
+
+machineEffects :: [(M.Sem, RuntimeAction)]
+machineEffects = [] -- FIXME
+
+static :: LangStatic M.Sem M.Ctx S.Cmd
 static = MkLangStatic
   { name = "comm"
   , options = []
   , fileParser = Just file
   , toplevelParser = Just top
-  , rts = \e _ -> (Left (LERuntime $ locate Nothing "NYI"), e)}
+  , rts = liftToRTS runMachine machineEffects }
 
-dynamic :: LangDynamic C.Sem C.Ctx
+dynamic :: LangDynamic M.Sem M.Ctx
 dynamic = MkLangDynamic
   { environment = mkRuntimeEnv ()
   , interactiveShell = True
@@ -49,5 +65,4 @@ main
   = runM
   . runReader static
   . evalState dynamic
-  $ mainPlan @C.Sem @C.Ctx @S.Cmd
-
+  $ mainPlan @M.Sem @M.Ctx @S.Cmd

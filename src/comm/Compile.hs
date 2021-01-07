@@ -8,23 +8,23 @@ import Machine
 import Syntax
 import Zoo
 
-type Ctx = ()
+type Compiler sig m =
+  ( Has (Reader [Text]) sig m
+  , Has (Throw LangError) sig m )
 
-type Sem = ()
-
-idx :: ( Has (Reader [Text]) sig m, Has (Throw LangError) sig m ) => Int -> Text -> m Int
+idx :: Compiler sig m => Int -> Text -> m Int
 idx k vn = do
   ctx <- ask @[Text]
   case ctx of
     []     -> throwError $ LECompile $ locate Nothing ""
     (v:vs) -> if vn == v then pure k else local (const vs) $ idx (k - 1) vn
 
-variableLocator :: ( Has (Reader [Text]) sig m, Has (Throw LangError) sig m ) => Text -> m Int
+variableLocator :: Compiler sig m => Text -> m Int
 variableLocator varName = do
   l <- asks @[Text] length
   idx (l - 1) varName
 
-compileAE :: ( Has (Reader [Text]) sig m, Has (Throw LangError) sig m ) => ArExp -> m [Instruction]
+compileAE :: Compiler sig m => ArExp -> m [Instruction]
 compileAE (AEVariable v) = do
   k <- variableLocator v
   pure [IGET k]
@@ -50,7 +50,7 @@ compileAE (AERemainder a b) = do
   y <- compileAE b
   pure $ x <> y <> [IMOD]
 
-compileBE :: ( Has (Reader [Text]) sig m, Has (Throw LangError) sig m ) => BoolExp -> m [Instruction]
+compileBE :: Compiler sig m => BoolExp -> m [Instruction]
 compileBE BETrue = pure [IPUSH 1]
 compileBE BEFalse = pure [IPUSH 0]
 compileBE (BEEqual a b) = do
@@ -73,7 +73,7 @@ compileBE (BENot a) = do
   x <- compileBE a
   pure $ x <> [INOT]
 
-compileC :: ( Has (Reader [Text]) sig m, Has (Throw LangError) sig m ) => Cmd -> m [Instruction]
+compileC :: Compiler sig m => Cmd -> m [Instruction]
 compileC (CNew v a w) = do
   x <- compileAE a
   y <- local (v:) $ compileC w

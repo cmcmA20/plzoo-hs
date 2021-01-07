@@ -205,8 +205,7 @@ defaultWrapper = Just ["rlwrap", "ledit"]
 type Language sem ctx cmd sig m =
   ( Has (Reader (LangStatic sem ctx cmd)) sig m
   , Has (State (LangDynamic sem ctx)) sig m
-  , Has (Lift IO) sig m
-  )
+  , Has (Lift IO) sig m )
 
 -- TODO show usage depending on target language parser
 -- usage
@@ -229,11 +228,13 @@ liftToRTS
   => Evaluator sem ctx cmd
   -> [(sem, RuntimeAction)]
   -> RTS sem ctx cmd
-liftToRTS ev acts = \env c ->
-  let (r, newCtx) = ev (env ^. #context) c
+liftToRTS ev acts env c =
+  let
+    (r, newCtx) = ev (env ^. #context) c
+    newEnv = env & #context .~ newCtx
    in case r of
-     Left  e -> (Left e, env & #context .~ newCtx)
-     Right x -> (Right (x, fromMaybe RANop (lookup x acts)), env & #context .~ newCtx)
+     Left  e -> (Left e, newEnv)
+     Right x -> (Right (x, fromMaybe RANop (lookup x acts)), newEnv)
 
 executeRuntimeAction
   :: Language sem ctx cmd sig m
