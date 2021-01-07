@@ -23,6 +23,7 @@ data BoolExp
   | BEAnd !BoolExp !BoolExp -- ^ conjunction [b1 and b2]
   | BEOr !BoolExp !BoolExp -- ^ disjunction [b1 or b2]
   | BENot !BoolExp -- ^ negation [not b]
+  deriving (Eq, Show)
 
 -- | Commands.
 data Cmd
@@ -33,3 +34,4 @@ data Cmd
   | CSeq !Cmd !Cmd -- ^ sequence commands [c1 ; c2]
   | CWhile !BoolExp !Cmd -- ^ loop [while b do c done]
   | CCond !BoolExp !Cmd !Cmd -- ^ conditional [if b then c1 else c2 end]
+  deriving (Eq, Show)
