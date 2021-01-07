@@ -16,7 +16,7 @@ top :: Text -> Either SyntaxError S.Cmd
 top t =
   let res = L.runAlex (T.unpack t) P.toplevel
    in case res of
-     Left  err -> Left $ MkSyntaxError $ locate Nothing $ T.pack err
+     Left  err -> Left $ alexErrorToSyntaxError err
      Right x   -> Right x
 
 static :: LangStatic E.Sem E.Ctx S.Cmd
@@ -29,9 +29,9 @@ static = MkLangStatic
 
 dynamic :: LangDynamic E.Sem E.Ctx
 dynamic = MkLangDynamic
-  { environment = MkRuntimeEnv {context = (), replResult = Nothing}
+  { environment = mkRuntimeEnv ()
   , interactiveShell = True
-  , wrapper = Just ["rlwrap", "ledit"]
+  , wrapper = defaultWrapper
   , files = [] }
 
 main :: IO ()

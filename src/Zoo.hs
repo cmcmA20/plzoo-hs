@@ -29,15 +29,14 @@ import qualified System.Posix.Signals            as S
 
 {- Location helpers -}
 
--- FIXME use alex type for delimited loc
 data Location
   = LNowhere -- No location
-  | LLocation !Integer !Integer -- Delimited location (row, column) ?
+  | LLocation !Integer !Integer -- Delimited location (line, column)
   deriving (Generic, Show)
 
 showLocation :: Location -> Text
-showLocation LNowhere        = "Unknown location"
-showLocation (LLocation r c) = "Row " <> T.pack (show r) <> ", Column " <> T.pack (show c)
+showLocation LNowhere        = "unknown location"
+showLocation (LLocation r c) = "line " <> T.pack (show r) <> ", column " <> T.pack (show c)
 
 data Located (a :: Type) = MkLocated
   { content :: !a
@@ -76,12 +75,28 @@ showErr errName l m =
       LLocation _ _ -> " at " <> showLocation l
   in errName <> locText <> ": " <> m
 
-newtype SyntaxError = MkSyntaxError { unSyntaxError :: Located Text }
+-- newtype SyntaxError = MkSyntaxError { unSyntaxError :: Located Text }
+
+-- instance Show SyntaxError where
+--   show (MkSyntaxError (MkLocated m l)) = T.unpack $ showErr "Syntax error" l m
+
+data SyntaxError
+  = SELex   !Location
+  | SEParse !Location
 
 instance Show SyntaxError where
-  show (MkSyntaxError (MkLocated m l)) = T.unpack $ showErr "Syntax error" l m
+  show (SELex   lo) = T.unpack $ showErr "Syntax error" lo "lexical error"
+  show (SEParse lo) = T.unpack $ showErr "Syntax error" lo "parse error"
 
 instance Exception SyntaxError
+
+-- dirty
+alexErrorToSyntaxError :: String -> SyntaxError
+alexErrorToSyntaxError (words -> ["lexical", "error", "at", "line", ls, "column", cs]) =
+  SELex $ LLocation (read (init ls)) (read cs)
+alexErrorToSyntaxError (words -> ["parse", "error", "at", "line", ls, "column", cs]) =
+  SEParse $ LLocation (read (init ls)) (read cs)
+alexErrorToSyntaxError _ = error "alexErrorToSyntaxError is a bad function"
 
 data LangError
   = LEType    !(Located Text)
@@ -165,6 +180,9 @@ data RuntimeEnv (sem :: Type) (ctx :: Type) = MkRuntimeEnv
   , replResult :: !(Maybe sem) }
   deriving Generic
 
+mkRuntimeEnv :: ctx -> RuntimeEnv sem ctx
+mkRuntimeEnv g = MkRuntimeEnv {context = g, replResult = Nothing}
+
 type Evaluator (sem :: Type) (ctx :: Type) (cmd :: Type) =
   ctx -> cmd -> (Either LangError sem, ctx)
 
@@ -188,6 +206,9 @@ data LangDynamic (sem :: Type) (ctx :: Type) = MkLangDynamic
   , wrapper          :: !(Maybe [Text])
   , files            :: ![(Text, Bool)] }
   deriving Generic
+
+defaultWrapper :: Maybe [Text]
+defaultWrapper = Just ["rlwrap", "ledit"]
 
 type Language sem ctx cmd sig m =
   ( Has (Reader (LangStatic sem ctx cmd)) sig m
