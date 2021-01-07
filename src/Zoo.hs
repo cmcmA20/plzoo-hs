@@ -163,13 +163,19 @@ data RuntimeEnv (sem :: Type) (ctx :: Type) = MkRuntimeEnv
   , replResult :: !(Maybe sem) }
   deriving Generic
 
+type RTS (sem :: Type) (ctx :: Type) (cmd :: Type) =
+  RuntimeEnv sem ctx -> cmd -> (Either LangError (sem, RuntimeAction), RuntimeEnv sem ctx)
+
 data LangStatic (sem :: Type) (ctx :: Type) (cmd :: Type) = MkLangStatic
   { name           :: !Text
   , options        :: ![(Text, Text, Text)] -- FIXME it's useless now
   , fileParser     :: !(Maybe (Text -> Either SyntaxError [cmd])) -- better safe than sorry
   , toplevelParser :: !(Maybe (Text -> Either SyntaxError cmd))
-  , exec           :: !(RuntimeEnv sem ctx -> cmd -> (Either LangError RuntimeAction, RuntimeEnv sem ctx)) }
+  , rts            :: !(RTS sem ctx cmd) }
   deriving Generic
+
+-- simpleEval : ctx -> cmd -> (Either LangError sem, ctx)
+-- realEval : RTE sem ctx -> cmd -> (Either LangError (sem, RuntimeAction), ctx)
 
 data LangDynamic (sem :: Type) (ctx :: Type) = MkLangDynamic
   { environment      :: !(RuntimeEnv sem ctx)
@@ -198,6 +204,12 @@ type Language sem ctx cmd sig m =
 
 {- Meta RTS -}
 
+liftExecutor
+  :: forall sem ctx cmd
+  .  (ctx -> cmd -> (Either LangError sem, ctx))
+  -> (RuntimeEnv sem ctx -> cmd -> (Either LangError (sem, RuntimeAction), RuntimeEnv sem ctx))
+liftExecutor = undefined
+
 executeRuntimeAction
   :: Language sem ctx cmd sig m
   => RuntimeAction
@@ -209,15 +221,19 @@ runCommand
   :: forall sem ctx cmd sig m
   .  Language sem ctx cmd sig m
   => cmd
-  -> m ()
+  -> m (Maybe sem)
 runCommand c = do
   oldEnv <- gets @(LangDynamic sem ctx) environment
-  ex <- asks @(LangStatic sem ctx cmd) exec
+  ex <- asks @(LangStatic sem ctx cmd) rts
   let (res, newEnv) = ex oldEnv c
   modify @(LangDynamic sem ctx) (& #environment .~ newEnv)
   case res of
-    Left  le -> printLangError le
-    Right ra -> executeRuntimeAction @sem @ctx @cmd ra
+    Left  le      -> do
+      printLangError le -- FIXME handle it higher
+      pure Nothing
+    Right (e, ra) -> do
+      executeRuntimeAction @sem @ctx @cmd ra
+      pure $ Just e
 
 addFile
   :: forall sem ctx sig m
@@ -247,7 +263,7 @@ readFile
 readFile p filename = do
   fc <- handle dieOnIOError $ sendIO $ TIO.readFile $ T.unpack filename
   case p fc of
-    Left  se -> printSyntaxError se >> pure []
+    Left  se -> printSyntaxError se >> pure [] -- FIXME handle it higher
     Right cs -> pure cs
   where
     dieOnIOError :: IOError -> m Text
@@ -265,9 +281,11 @@ readToplevel p = do
     promptMore = T.replicate (T.length ln) " " <> "> "
   sendIO $ TIO.putStr prompt
   inp <- sendIO $ getMultiline promptMore
-  case p inp of
-    Left  se -> printSyntaxError se >> pure Nothing
-    Right c  -> pure $ Just c
+  if not $ T.null inp
+     then case p inp of
+       Left  se -> printSyntaxError se >> pure Nothing -- FIXME handle it higher
+       Right c  -> pure $ Just c
+     else pure Nothing
   where
     getMultiline :: Text -> IO Text
     getMultiline pm = do
@@ -290,15 +308,13 @@ useFile (filename, _) = do
   forM_ cs $ runCommand @sem @ctx
 
 interactivePrinter
-  :: forall sem ctx sig m
-  .  ( Has (State (LangDynamic sem ctx)) sig m
+  :: forall sem ctx cmd sig m
+  .  ( Language sem ctx cmd sig m
      , Show sem )
-  => m Text
+  => m ()
 interactivePrinter = do
   rr <- gets @(LangDynamic sem ctx) (^. #environment . #replResult)
-  pure $ case rr of
-    Nothing -> ""
-    Just t  -> T.pack $ show t
+  maybe (pure ()) (sendIO . TIO.putStrLn . T.pack . show) rr
 
 toplevel
   :: forall sem ctx cmd sig m
@@ -317,9 +333,12 @@ toplevel = do
     , Handler gracefulEOF
     ] do
         mc <- readToplevel @sem @ctx tlp
-        maybe (pure ()) (runCommand @sem @ctx) mc
-        res <- interactivePrinter @sem @ctx
-        sendIO $ TIO.putStrLn res
+        case mc of
+          Nothing -> modify @(LangDynamic sem ctx) (& #environment . #replResult .~ Nothing)
+          Just c  -> do
+            r <- runCommand @sem @ctx c
+            modify @(LangDynamic sem ctx) (& #environment . #replResult .~ r)
+        interactivePrinter @sem @ctx @cmd
   where
     eofMarker :: Text
     eofMarker = case S.os of
