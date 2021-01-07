@@ -10,3 +10,5 @@ data Exp
   | Divide  !Exp !Exp  -- Quotient [e1 / e2]
   | Negate  !Exp       -- Opposite value [-e]
   deriving (Eq, Show)
+
+type Cmd = Exp

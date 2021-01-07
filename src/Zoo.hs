@@ -3,7 +3,8 @@ module Zoo where
 
 import           Control.Algebra
 import qualified Control.Concurrent              as S
-import           Control.Effect.Exception
+import           Control.Effect.Error
+import           Control.Effect.Exception hiding (TypeError)
 import           Control.Effect.Lift
 import           Control.Effect.Reader
 import           Control.Effect.State
@@ -25,25 +26,36 @@ import qualified System.IO                       as S
 import qualified System.Posix.Process            as S
 import qualified System.Posix.Signals            as S
 
+{- Location helpers -}
+
 -- FIXME use alex type for delimited loc
 data Location
   = LNowhere -- No location
   | LLocation !Integer !Integer -- Delimited location (row, column) ?
+  deriving (Generic, Show)
 
 showLocation :: Location -> Text
 showLocation LNowhere        = "Unknown location"
 showLocation (LLocation r c) = "Row " <> T.pack (show r) <> ", Column " <> T.pack (show c)
 
-instance Show Location where
-  show = T.unpack . showLocation
-
 data Located (a :: Type) = MkLocated
   { content :: !a
   , loc     :: !Location }
+  deriving (Generic, Show)
 
 locate :: Maybe Location -> a -> Located a
-locate Nothing    x = MkLocated x LNowhere
-locate (Just loc) x = MkLocated x loc
+locate Nothing  x = MkLocated x LNowhere
+locate (Just l) x = MkLocated x l
+
+{- Error handling -}
+
+maybeThrowIO :: (Has (Lift IO) sig m, Exception e) => e -> Maybe a -> m a
+maybeThrowIO err Nothing  = throwIO err
+maybeThrowIO _   (Just v) = pure v
+
+maybeThrow :: (Has (Throw e) sig m, Exception e) => e -> Maybe a -> m a
+maybeThrow err Nothing  = throwError err
+maybeThrow _   (Just v) = pure v
 
 newtype InternalError = MkInternalError { unInternalError :: Text }
 
@@ -55,64 +67,45 @@ instance Show InternalError where
 
 instance Exception InternalError
 
-raiseInternalError :: Has (Lift IO) sig m => Text -> m a
-raiseInternalError = throwIO . MkInternalError
+showErr :: Text -> Location -> Text -> Text
+showErr errName l m =
+  let
+    locText = case l of
+      LNowhere      -> ""
+      LLocation _ _ -> " at " <> showLocation l
+  in errName <> locText <> ": " <> m
 
-maybeRaiseInternalError :: Has (Lift IO) sig m => Text -> Maybe a -> m a
-maybeRaiseInternalError r Nothing  = throwIO $ MkInternalError r
-maybeRaiseInternalError _ (Just v) = pure v
+newtype SyntaxError = MkSyntaxError { unSyntaxError :: Located Text }
 
-data ErrorKind
-  = EKSyntax
-  | EKType
-  | EKCompile
-  | EKRuntime
+instance Show SyntaxError where
+  show (MkSyntaxError (MkLocated m l)) = T.unpack $ showErr "Syntax error" l m
 
-showErrorKind :: ErrorKind -> Text
-showErrorKind EKSyntax    = "Syntax error"
-showErrorKind EKType      = "Type error"
-showErrorKind EKCompile   = "Compilation error"
-showErrorKind EKRuntime   = "Runtime error"
+printSyntaxError :: Has (Lift IO) sig m => SyntaxError -> m ()
+printSyntaxError = sendIO . TIO.putStrLn . T.pack . show
 
-instance Show ErrorKind where
-  show = T.unpack . showErrorKind
+data LangError
+  = LEType    !(Located Text)
+  | LECompile !(Located Text)
+  | LERuntime !(Located Text)
 
-data PLZException = MkPLZException
-  { loc :: !Location
-  , ek  :: !ErrorKind
-  , msg :: !Text }
+instance Show LangError where
+  show (LEType    (MkLocated m l)) = T.unpack $ showErr "Type error" l m
+  show (LECompile (MkLocated m l)) = T.unpack $ showErr "Compile error" l m
+  show (LERuntime (MkLocated m l)) = T.unpack $ showErr "Runtime error" l m
 
-showPLZE :: PLZException -> Text
-showPLZE MkPLZException{..} = showErrorKind ek <>
-  case loc of
-    LNowhere      -> ": " <> msg
-    LLocation _ _ -> " at " <> showLocation loc <> ": " <> msg
+printLangError :: Has (Lift IO) sig m => LangError -> m ()
+printLangError = sendIO . TIO.putStrLn . T.pack . show
 
-instance Show PLZException where
-  show = T.unpack . showPLZE
+-- is it even needed?
+-- showWithParens :: Integer -> Integer -> (a -> Text) -> (a -> Text)
+-- showWithParens maxLevel atLevel p =
+--   if maxLevel < atLevel
+--      then \x -> "(" <> p x <> ")"
+--      else p
 
-instance Exception PLZException
+{- Command line options parsing -}
 
-raiseError :: Has (Lift IO) sig m => ErrorKind -> Location -> Text -> m a
-raiseError ek loc msg = throwIO $ MkPLZException loc ek msg
-
--- TODO refactor all these uncertain error throws
-maybeRaiseError :: Has (Lift IO) sig m => ErrorKind -> Location -> Text -> Maybe a -> m a
-maybeRaiseError ek loc msg Nothing  = raiseError ek loc msg
-maybeRaiseError _  _   _   (Just v) = pure v
-
-raiseErrorClassic :: ErrorKind -> Location -> Text -> a
-raiseErrorClassic ek loc msg = throw $ MkPLZException loc ek msg
-
-printError :: Has (Lift IO) sig m => PLZException -> m ()
-printError = sendIO . TIO.putStrLn . showPLZE
-
-showWithParens :: Integer -> Integer -> (a -> Text) -> (a -> Text)
-showWithParens maxLevel atLevel p =
-  if maxLevel < atLevel
-     then \x -> "(" <> p x <> ")"
-     else p
-
+-- TODO parametric parser
 data Opts = MkOpts
   { wrappers       :: !(Maybe [Text])
   , noWrapper      :: !Bool
@@ -121,8 +114,8 @@ data Opts = MkOpts
   , fileToLoad     :: ![Text] }
   deriving (Generic, Show)
 
-parseOpts :: Parser Opts
-parseOpts = MkOpts
+defaultOpts :: Parser Opts
+defaultOpts = MkOpts
   <$> optional (many (strOption ( long "wrapper"
     <> metavar "WRAPPER"
     <> help "Specify a command-line wrapper to be used (such as rlwrap or ledit)" )))
@@ -135,45 +128,59 @@ parseOpts = MkOpts
   <*> many (strOption (short 'l'
     <> help "Load file into the initial environment"))
 
-applyOpts :: forall env cmd sig m. Language env cmd sig m => m ()
+applyOpts
+  :: forall sem ctx cmd sig m
+  .  Language sem ctx cmd sig m
+  => m ()
 applyOpts = do
   o <- sendIO $ execParser fullOpts
   when (o ^. #onlyLangInfo) do
-    ln <- asks @(LangStatic env cmd) name
+    ln <- asks @(LangStatic sem ctx cmd) name
     sendIO do
       TIO.putStrLn $ ln <> " (" <> T.pack S.os <> ")"
       S.exitSuccess
-  modify @(LangDynamic env) (& #wrapper %~ (o ^. #wrappers <>))
+  modify @(LangDynamic sem ctx) (& #wrapper %~ (o ^. #wrappers <>))
   when (o ^. #noWrapper) do
-    modify @(LangDynamic env) (& #wrapper .~ Nothing)
+    modify @(LangDynamic sem ctx) (& #wrapper .~ Nothing)
   when (o ^. #nonInteractive) do
-    modify @(LangDynamic env) (& #interactiveShell .~ False)
+    modify @(LangDynamic sem ctx) (& #interactiveShell .~ False)
   where
     fullOpts :: ParserInfo Opts
-    fullOpts = info (parseOpts <**> helper)
+    fullOpts = info (defaultOpts <**> helper)
       (  fullDesc
       <> progDesc "exists s t. Lang s -> Lang t"
       <> header "The Programming Languages Zoo" )
 
-data LangStatic (env :: Type) (cmd :: Type) = MkLangStatic
-  { name           :: !Text
-  , options        :: ![(Text, Text, Text)]
-  , fileParser     :: !(Maybe (Text -> [cmd]))
-  , toplevelParser :: !(Maybe (Text -> cmd))
-  , exec           :: env -> cmd -> env
-  , prettyPrinter  :: env -> Text }
+{- Core -}
+
+data RuntimeAction
+  = RANop
+  | RAPrint !Text
   deriving Generic
 
-data LangDynamic (env :: Type) = MkLangDynamic
-  { environment      :: !env
+data RuntimeEnv (sem :: Type) (ctx :: Type) = MkRuntimeEnv
+  { context    :: !ctx
+  , replResult :: !(Maybe sem) }
+  deriving Generic
+
+data LangStatic (sem :: Type) (ctx :: Type) (cmd :: Type) = MkLangStatic
+  { name           :: !Text
+  , options        :: ![(Text, Text, Text)] -- FIXME it's useless now
+  , fileParser     :: !(Maybe (Text -> Either SyntaxError [cmd])) -- better safe than sorry
+  , toplevelParser :: !(Maybe (Text -> Either SyntaxError cmd))
+  , exec           :: !(RuntimeEnv sem ctx -> cmd -> (Either LangError RuntimeAction, RuntimeEnv sem ctx)) }
+  deriving Generic
+
+data LangDynamic (sem :: Type) (ctx :: Type) = MkLangDynamic
+  { environment      :: !(RuntimeEnv sem ctx)
   , interactiveShell :: !Bool
   , wrapper          :: !(Maybe [Text])
   , files            :: ![(Text, Bool)] }
   deriving Generic
 
-type Language env cmd sig m =
-  ( Has (Reader (LangStatic env cmd)) sig m
-  , Has (State (LangDynamic env)) sig m
+type Language sem ctx cmd sig m =
+  ( Has (Reader (LangStatic sem ctx cmd)) sig m
+  , Has (State (LangDynamic sem ctx)) sig m
   , Has (Lift IO) sig m
   )
 
@@ -189,54 +196,78 @@ type Language env cmd sig m =
 --     Nothing -> ""
 --     Just _  -> " [file] ..."
 
+{- Meta RTS -}
+
+executeRuntimeAction
+  :: Language sem ctx cmd sig m
+  => RuntimeAction
+  -> m ()
+executeRuntimeAction RANop = pure ()
+executeRuntimeAction _     = throwIO $ MkInternalError "Not yet implemented"
+
+runCommand
+  :: forall sem ctx cmd sig m
+  .  Language sem ctx cmd sig m
+  => cmd
+  -> m ()
+runCommand c = do
+  oldEnv <- gets @(LangDynamic sem ctx) environment
+  ex <- asks @(LangStatic sem ctx cmd) exec
+  let (res, newEnv) = ex oldEnv c
+  modify @(LangDynamic sem ctx) (& #environment .~ newEnv)
+  case res of
+    Left  le -> printLangError le
+    Right ra -> executeRuntimeAction @sem @ctx @cmd ra
+
 addFile
-  :: forall env sig m
-  .  Has (State (LangDynamic env)) sig m
+  :: forall sem ctx sig m
+  .  Has (State (LangDynamic sem ctx)) sig m
   => Bool
   -> Text
   -> m ()
 addFile interactive filename =
-  modify @(LangDynamic env) (& #files %~ ( (filename, interactive) : ))
+  modify @(LangDynamic sem ctx) (& #files %~ ( (filename, interactive) : ))
 
 -- TODO use anonymous arguments?
-anonymous
-  :: forall env sig m
-  .  Has (State (LangDynamic env)) sig m
-  => Text
-  -> m ()
-anonymous t = do
-  addFile @env True t
-  modify @(LangDynamic env) (& #interactiveShell .~ False)
+-- anonymous
+--   :: forall env sig m
+--   .  Has (State (LangDynamic env)) sig m
+--   => Text
+--   -> m ()
+-- anonymous t = do
+--   addFile @env True t
+--   modify @(LangDynamic env) (& #interactiveShell .~ False)
 
 readFile
-  :: forall env cmd sig m
-  .  Language env cmd sig m
-  => (Text -> [cmd])
+  :: forall sem ctx cmd sig m
+  .  Language sem ctx cmd sig m
+  => (Text -> Either SyntaxError [cmd])
   -> Text
   -> m [cmd]
 readFile p filename = do
   fc <- handle dieOnIOError $ sendIO $ TIO.readFile $ T.unpack filename
-  handle discardBrokenFile $ pure $ p fc
+  case p fc of
+    Left  se -> printSyntaxError se >> pure []
+    Right cs -> pure cs
   where
     dieOnIOError :: IOError -> m Text
-    dieOnIOError = raiseInternalError . T.pack . show
-
-    discardBrokenFile :: PLZException  -> m [cmd]
-    discardBrokenFile e = printError e >> pure []
+    dieOnIOError = throwIO . MkInternalError . T.pack . show
 
 readToplevel
-  :: forall env cmd sig m
-  .  Language env cmd sig m
-  => (Text -> cmd)
-  -> m cmd
+  :: forall sem ctx cmd sig m
+  .  Language sem ctx cmd sig m
+  => (Text -> Either SyntaxError cmd)
+  -> m (Maybe cmd)
 readToplevel p = do
-  ln <- asks @(LangStatic env cmd) name
+  ln <- asks @(LangStatic sem ctx cmd) name
   let
     prompt     = ln <> "> "
     promptMore = T.replicate (T.length ln) " " <> "> "
   sendIO $ TIO.putStr prompt
   inp <- sendIO $ getMultiline promptMore
-  pure $ p inp
+  case p inp of
+    Left  se -> printSyntaxError se >> pure Nothing
+    Right c  -> pure $ Just c
   where
     getMultiline :: Text -> IO Text
     getMultiline pm = do
@@ -248,39 +279,46 @@ readToplevel p = do
          else pure inp
 
 useFile
-  :: forall env cmd sig m
-  .  Language env cmd sig m
+  :: forall sem ctx cmd sig m
+  .  Language sem ctx cmd sig m
   => (Text, Bool)
   -> m ()
 useFile (filename, _) = do
-  flp <- asks @(LangStatic env cmd) fileParser >>=
-    maybeRaiseInternalError "This language can't load files."
-  ex  <- asks @(LangStatic env cmd) exec
-  cs  <- readFile @env @cmd flp filename
-  forM_ cs \c -> do
-    modify @(LangDynamic env) (& #environment %~ \e -> ex e c)
+  flp <- asks @(LangStatic sem ctx cmd) fileParser >>=
+    maybeThrowIO (MkInternalError "This language can't load files.")
+  cs  <- readFile @sem @ctx @cmd flp filename
+  forM_ cs $ runCommand @sem @ctx
+
+interactivePrinter
+  :: forall sem ctx sig m
+  .  ( Has (State (LangDynamic sem ctx)) sig m
+     , Show sem )
+  => m Text
+interactivePrinter = do
+  rr <- gets @(LangDynamic sem ctx) (^. #environment . #replResult)
+  pure $ case rr of
+    Nothing -> ""
+    Just t  -> T.pack $ show t
 
 toplevel
-  :: forall env cmd sig m
-  .  Language env cmd sig m
+  :: forall sem ctx cmd sig m
+  .  ( Language sem ctx cmd sig m
+     , Show sem )
   => m ()
 toplevel = do
-  tlp <- asks @(LangStatic env cmd) toplevelParser >>=
-    maybeRaiseInternalError "This language has no toplevel."
-  ex  <- asks @(LangStatic env cmd) exec
-  pr  <- asks @(LangStatic env cmd) prettyPrinter
-  languageName <- asks @(LangStatic env cmd) name
+  tlp <- asks @(LangStatic sem ctx cmd) toplevelParser >>=
+    maybeThrowIO (MkInternalError "This language has no toplevel.")
+  languageName <- asks @(LangStatic sem ctx cmd) name
   sendIO $ TIO.putStrLn
     $  languageName <> " -- programming languages zoo\n"
     <> "Type " <> eofMarker <> " to exit."
   forever $ flip catches
     [ Handler handleUserInterrupt
     , Handler gracefulEOF
-    , Handler printError
     ] do
-        c <- readToplevel @env tlp
-        modify @(LangDynamic env) (& #environment %~ \e -> ex e c)
-        res <- pr <$> gets @(LangDynamic env) environment
+        mc <- readToplevel @sem @ctx tlp
+        maybe (pure ()) (runCommand @sem @ctx) mc
+        res <- interactivePrinter @sem @ctx
         sendIO $ TIO.putStrLn res
   where
     eofMarker :: Text
@@ -299,16 +337,18 @@ toplevel = do
         _     -> throwIO ioe
 
 mainPlan
-  :: forall env cmd sig m
-  .  Language env cmd sig m
+  :: forall sem ctx cmd sig m
+  .  ( Language sem ctx cmd sig m
+     , Show sem )
   => m ()
 mainPlan = do
-  myTid <- sendIO S.myThreadId
-  void $ sendIO $ S.installHandler S.keyboardSignal (S.Catch $ S.throwTo myTid UserInterrupt) Nothing
-  sendIO $ S.hSetBuffering S.stdout S.NoBuffering
-  applyOpts @env @cmd
-  interactive <- gets @(LangDynamic env) interactiveShell
-  mwr <- gets @(LangDynamic env) wrapper
+  sendIO do
+    myTid <- S.myThreadId
+    void $ S.installHandler S.keyboardSignal (S.Catch $ S.throwTo myTid UserInterrupt) Nothing
+    S.hSetBuffering S.stdout S.NoBuffering
+  applyOpts @sem @ctx @cmd -- TODO parametric parser
+  interactive <- gets @(LangDynamic sem ctx) interactiveShell
+  mwr <- gets @(LangDynamic sem ctx) wrapper
   when interactive do
     flip (maybe (pure ())) mwr \wrs -> do
       myPath  <- sendIO S.getExecutablePath
@@ -316,6 +356,6 @@ mainPlan = do
       forM_ wrs \w ->
         handle @IOError (const $ pure ()) $ void $ sendIO $
           S.executeFile (T.unpack w) True (myPath : newArgs) Nothing
-  fs <- reverse <$> gets @(LangDynamic env) files
-  handle printError $ forM_ fs $ useFile @env @cmd
-  when interactive $ toplevel @env @cmd
+  fs <- reverse <$> gets @(LangDynamic sem ctx) files
+  forM_ fs $ useFile @sem @ctx @cmd
+  when interactive $ toplevel @sem @ctx @cmd
