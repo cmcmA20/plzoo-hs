@@ -21,3 +21,6 @@ eval (Divide  a b) = do
      then liftA2 div (eval a) (pure y)
      else Left $ LERuntime $ locate Nothing "Division by zero"
 eval (Negate  a  ) = negate <$> eval a
+
+eval' :: Evaluator Sem Ctx Cmd
+eval' _ c = (eval c, ())

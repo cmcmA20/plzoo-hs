@@ -3,7 +3,6 @@ module Main where
 import           Control.Carrier.Lift
 import           Control.Carrier.Reader
 import           Control.Carrier.State.Strict
-import           Control.Lens
 import           Data.Text (Text)
 import qualified Data.Text                    as T
 
@@ -20,18 +19,13 @@ top t =
      Left  err -> Left $ MkSyntaxError $ locate Nothing $ T.pack err
      Right x   -> Right x
 
-ex :: RuntimeEnv E.Sem E.Ctx -> S.Cmd -> (Either LangError (E.Sem, RuntimeAction), RuntimeEnv E.Sem E.Ctx)
-ex env cmd = case E.eval cmd of
-  Left  le -> (Left le, env)
-  Right r  -> (Right (r, RANop), env & #replResult .~ Just r)
-
 static :: LangStatic E.Sem E.Ctx S.Cmd
 static = MkLangStatic
   { name = "calc"
   , options = []
   , fileParser = Nothing
   , toplevelParser = Just top
-  , rts = ex }
+  , rts = liftToRTS E.eval' [] }
 
 dynamic :: LangDynamic E.Sem E.Ctx
 dynamic = MkLangDynamic
