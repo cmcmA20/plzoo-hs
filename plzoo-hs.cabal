@@ -38,6 +38,7 @@ library
                       , RankNTypes
                       , ScopedTypeVariables
                       , TypeApplications
+                      , ViewPatterns
   ghc-options:         -Wall
 
 executable calc
