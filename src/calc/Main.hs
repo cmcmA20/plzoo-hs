@@ -3,6 +3,7 @@ module Main where
 import           Control.Carrier.Lift
 import           Control.Carrier.Reader
 import           Control.Carrier.State.Strict
+import           Control.Lens
 import           Data.Text (Text)
 import qualified Data.Text                    as T
 
@@ -12,30 +13,29 @@ import qualified Parser as P
 import qualified Syntax as S
 import           Zoo
 
-type Env = Maybe Integer
-
-showEnv :: Env -> Text
-showEnv = foldMap $ T.pack . show
-
-top :: Text -> S.Exp
+top :: Text -> Either SyntaxError S.Cmd
 top t =
   let res = L.runAlex (T.unpack t) P.toplevel
    in case res of
-     Left  err -> raiseErrorClassic EKSyntax LNowhere (T.pack err)
-     Right x   -> x
+     Left  err -> Left $ MkSyntaxError $ locate Nothing $ T.pack err
+     Right x   -> Right x
 
-calcStatic :: LangStatic Env S.Exp
-calcStatic = MkLangStatic
+ex :: RuntimeEnv E.Sem E.Ctx -> S.Cmd -> (Either LangError RuntimeAction, RuntimeEnv E.Sem E.Ctx)
+ex env cmd = case E.eval cmd of
+  Left  le -> (Left le, env)
+  Right r  -> (Right RANop, env & #replResult .~ Just r)
+
+static :: LangStatic E.Sem E.Ctx S.Cmd
+static = MkLangStatic
   { name = "calc"
   , options = []
   , fileParser = Nothing
   , toplevelParser = Just top
-  , exec = const (Just . E.eval)
-  , prettyPrinter = showEnv }
+  , exec = ex }
 
-calcDynamic :: LangDynamic Env
-calcDynamic = MkLangDynamic
-  { environment = Nothing
+dynamic :: LangDynamic E.Sem E.Ctx
+dynamic = MkLangDynamic
+  { environment = MkRuntimeEnv {context = (), replResult = Nothing}
   , interactiveShell = True
   , wrapper = Just ["rlwrap", "ledit"]
   , files = [] }
@@ -43,6 +43,6 @@ calcDynamic = MkLangDynamic
 main :: IO ()
 main
   = runM
-  . runReader calcStatic
-  . evalState calcDynamic
-  $ mainPlan @Env @S.Exp
+  . runReader static
+  . evalState dynamic
+  $ mainPlan @E.Sem @E.Ctx @S.Cmd
