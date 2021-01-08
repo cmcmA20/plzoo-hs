@@ -307,11 +307,11 @@ readToplevel p = do
     promptMore = T.replicate (T.length ln) " " <> "> "
   sendIO $ TIO.putStr prompt
   inp <- sendIO $ getMultiline promptMore
-  if inp /= "\n"
-     then case p inp of
+  if T.all (== '\n') inp
+     then pure Nothing
+     else case p inp of
        Left  se -> printError se >> pure Nothing -- FIXME handle it higher
        Right c  -> pure $ Just c
-     else pure Nothing
   where
     getMultiline :: Text -> IO Text
     getMultiline pm = do
