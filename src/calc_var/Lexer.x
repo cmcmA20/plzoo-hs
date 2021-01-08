@@ -13,7 +13,6 @@ $digit = 0-9
 tokens :-
 
   $white+                     ;
-  \n                          { tok TNewline }
   $digit+                     { \(_,_,_,s) len -> pure (TNumeral (read (take len s))) }
   $alpha [$alpha $digit \_ ]* { \(_,_,_,s) len -> pure (TVariable (T.pack (take len s))) }
   \=                          { tok TEqual }
@@ -26,8 +25,7 @@ tokens :-
 
 {
 data Token
-  = TNewline
-  | TNumeral !Integer
+  = TNumeral !Integer
   | TVariable !Text
   | TEqual
   | TPlus

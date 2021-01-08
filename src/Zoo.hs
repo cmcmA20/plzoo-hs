@@ -1,10 +1,10 @@
--- This file contains all the common code used by the languages implemented in the PL Zoo.
+-- | This file contains all the common code used by the languages implemented in the PL Zoo.
 module Zoo where
 
 import           Control.Algebra
 import qualified Control.Concurrent              as S
 import           Control.Effect.Error
-import           Control.Effect.Exception hiding (TypeError)
+import           Control.Effect.Exception
 import           Control.Effect.Lift
 import           Control.Effect.Reader
 import           Control.Effect.State
@@ -12,7 +12,6 @@ import           Control.Lens
 import           Control.Monad (forever, forM_, void, when)
 import           Data.Generics.Labels ()
 import           Data.Kind (Type)
-import           Data.Maybe (fromMaybe)
 import           Data.Text (Text)
 import qualified Data.Text                       as T
 import qualified Data.Text.IO                    as TIO
@@ -226,7 +225,7 @@ liftToRTS
   :: forall sem ctx cmd
   .  Eq sem
   => Evaluator sem ctx cmd
-  -> [(sem, RuntimeAction)]
+  -> (sem -> RuntimeAction)
   -> RTS sem ctx cmd
 liftToRTS ev acts env c =
   let
@@ -234,7 +233,7 @@ liftToRTS ev acts env c =
     newEnv = env & #context .~ newCtx
    in case r of
      Left  e -> (Left e, newEnv)
-     Right x -> (Right (x, fromMaybe RANop (lookup x acts)), newEnv)
+     Right x -> (Right (x, acts x), newEnv)
 
 executeRuntimeAction
   :: Language sem ctx cmd sig m
@@ -307,7 +306,7 @@ readToplevel p = do
     promptMore = T.replicate (T.length ln) " " <> "> "
   sendIO $ TIO.putStr prompt
   inp <- sendIO $ getMultiline promptMore
-  if not $ T.null inp
+  if inp /= "\n"
      then case p inp of
        Left  se -> printError se >> pure Nothing -- FIXME handle it higher
        Right c  -> pure $ Just c
@@ -319,8 +318,8 @@ readToplevel p = do
       if not (T.null inp) && T.last inp == '\\'
          then do
            TIO.putStr pm
-           (T.init inp <>) <$> getMultiline pm
-         else pure inp
+           ((T.init inp <> "\n") <>) <$> getMultiline pm
+         else pure $ inp <> "\n"
 
 useFile
   :: forall sem ctx cmd sig m

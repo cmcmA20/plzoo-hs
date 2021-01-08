@@ -64,14 +64,12 @@ type Machine sig m =
   ( Has (State MachineState) sig m
   , Has (Throw MachineError) sig m )
 
--- | Instruction semantics
-data InstSem
-  = ISPure -- ^ pure computation
-  | ISOutput !Text -- ^ writing to an output port
+data MachineEffect
+  = MEOutput !Text -- ^ writing to an output port
   deriving (Eq, Show)
 
 -- | Machine semantics
-type Sem = [InstSem]
+type Sem = [MachineEffect]
 
 type Ctx = ()
 
@@ -80,7 +78,7 @@ mkMachineState prog ramSize = MkMachineState
   { code = IM.fromList $ zip [0..] prog
   , ram = IM.fromList $ zip [0..] $ replicate ramSize 0
   , pc = 0
-  , sp = ramSize - 1 }
+  , sp = ramSize - 1}
 
 readMem :: Machine sig m => Int -> m Int
 readMem k = gets (IM.lookup k . ram) >>= maybeThrow MEIllegalAddress
@@ -88,7 +86,7 @@ readMem k = gets (IM.lookup k . ram) >>= maybeThrow MEIllegalAddress
 writeMem :: Machine sig m => Int -> Int -> m ()
 writeMem k x = do
   st <- get @MachineState
-  if k >= IM.size (st ^. #ram)
+  if k < 0 || k >= IM.size (st ^. #ram)
      then throwError MEIllegalAddress
      else put $ st & #ram %~ IM.insert k x
 
@@ -109,79 +107,79 @@ b2i :: Bool -> Int
 b2i False = 0
 b2i True  = 1
 
-executeInstruction :: Machine sig m => Instruction -> m InstSem
-executeInstruction INOP = pure ISPure
+executeInstruction :: Machine sig m => Instruction -> m Sem
+executeInstruction INOP = pure mempty
 executeInstruction (ISET k) = do
   x <- popStack
   writeMem k x
-  pure ISPure
+  pure mempty
 executeInstruction (IGET k) = do
   x <- readMem k
   pushStack x
-  pure ISPure
-executeInstruction (IPUSH x) = pushStack x >> pure ISPure
+  pure mempty
+executeInstruction (IPUSH x) = pushStack x >> pure mempty
 executeInstruction IADD = do
   y <- popStack
   x <- popStack
   pushStack $ x + y
-  pure ISPure
+  pure mempty
 executeInstruction ISUB = do
   y <- popStack
   x <- popStack
   pushStack $ x - y
-  pure ISPure
+  pure mempty
 executeInstruction IMUL = do
   y <- popStack
   x <- popStack
   pushStack $ x * y
-  pure ISPure
+  pure mempty
 executeInstruction IDIV = do
   y <- popStack
   x <- popStack
   if y == 0
      then throwError MEZeroDivision
      else pushStack $ x `div` y
-  pure ISPure
+  pure mempty
 executeInstruction IMOD = do
   y <- popStack
   x <- popStack
   if y == 0
      then throwError MEZeroDivision
      else pushStack $ x `mod` y
-  pure ISPure
+  pure mempty
 executeInstruction IEQ = do
   y <- popStack
   x <- popStack
   pushStack $ b2i $ x == y
-  pure ISPure
+  pure mempty
 executeInstruction ILT = do
   y <- popStack
   x <- popStack
   pushStack $ b2i $ x < y
-  pure ISPure
+  pure mempty
 executeInstruction IAND = do
   y <- popStack
   x <- popStack
   pushStack $ b2i $ x /= 0 && y /= 0
-  pure ISPure
+  pure mempty
 executeInstruction IOR = do
   y <- popStack
   x <- popStack
   pushStack $ b2i $ x /= 0 || y /= 0
-  pure ISPure
+  pure mempty
 executeInstruction INOT = do
   x <- popStack
   pushStack $ b2i $ x == 0
-  pure ISPure
-executeInstruction (IJMP k) = modify @MachineState (& #pc +~ k) >> pure ISPure
+  pure mempty
+executeInstruction (IJMP k) = modify @MachineState (& #pc +~ k) >> pure mempty
 executeInstruction (IJMPZ k) = do
   x <- popStack
   when (x == 0) $ modify @MachineState (& #pc +~ k)
-  pure ISPure
-executeInstruction IPRINT = ISOutput . (<> "\n") . T.pack . show <$> popStack
+  pure mempty
+executeInstruction IPRINT = pure . MEOutput . (<> "\n") . T.pack . show <$> popStack
 
 runProgram :: Machine sig m => m Sem
 runProgram = do
   st <- get @MachineState
   res <- forM (st ^. #code) executeInstruction
-  pure $ map snd $ IM.toAscList res
+  pure $ mconcat $ map snd $ IM.toAscList res

@@ -16,7 +16,7 @@ idx :: Compiler sig m => Int -> Text -> m Int
 idx k vn = do
   ctx <- ask @[Text]
   case ctx of
-    []     -> throwError $ LECompile $ locate Nothing ""
+    []     -> throwError $ LECompile $ locate Nothing $ "unknown variable " <> vn
     (v:vs) -> if vn == v then pure k else local (const vs) $ idx (k - 1) vn
 
 variableLocator :: Compiler sig m => Text -> m Int

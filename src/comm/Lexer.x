@@ -12,11 +12,13 @@ $digit = 0-9
 
 @variable = [\_ $alpha ] [\_ $alpha $digit]*
 @number = \-? [$digit]+
+@comment = \# .* \n
 
 tokens :-
 
-  $white+   ;
-  \n        { tok TNewline }
+  @comment  ;
+  \n        ;
+  [\ \t]+   ;
   @number   { \(_,_,_,s) len -> pure (TNumeral (read (take len s))) }
   "true"    { tok TTrue }
   "false"   { tok TFalse }
@@ -49,8 +51,7 @@ tokens :-
 
 {
 data Token
-  = TNewline
-  | TNumeral !Int
+  = TNumeral !Int
   | TTrue
   | TFalse
   | TSkip

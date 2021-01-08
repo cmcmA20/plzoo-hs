@@ -42,8 +42,8 @@ runMachine e c = (result, e)
       first translateErrors $
         run $ evalState blankMachine $ runThrow @M.MachineError M.runProgram
 
-machineEffects :: [(M.Sem, RuntimeAction)]
-machineEffects = [] -- FIXME
+machineEffects :: M.Sem -> RuntimeAction
+machineEffects _ = RANop -- FIXME
 
 static :: LangStatic M.Sem M.Ctx S.Cmd
 static = MkLangStatic
