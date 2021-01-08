@@ -9,7 +9,7 @@ import           Control.Carrier.State.Strict
 import           Control.Carrier.Throw.Either
 import           Control.Exception (Exception)
 import           Control.Lens
-import           Control.Monad (forM, when)
+import           Control.Monad (when)
 import           Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IM
 import           Data.Text (Text)
@@ -37,7 +37,7 @@ data Instruction
   | IJMP !Int -- ^ relative jump
   | IJMPZ !Int -- ^ relative jump if zero on the stack
   | IPRINT -- ^ pop from stack and print
-  deriving (Eq, Show)
+  deriving (Eq, Generic, Show)
 
 -- | Machine errors.
 data MachineError
@@ -69,7 +69,11 @@ data MachineEffect
   deriving (Eq, Show)
 
 -- | Machine semantics
-type Sem = [MachineEffect]
+newtype Sem = MkSem { unSem :: [MachineEffect] }
+  deriving (Eq, Monoid, Semigroup)
+
+instance Show Sem where
+  show _ = ""
 
 type Ctx = ()
 
@@ -92,16 +96,18 @@ writeMem k x = do
 
 popStack :: Machine sig m => m Int
 popStack = do
-  s <- gets @MachineState sp
-  x <- readMem s
-  modify @MachineState (& #sp +~ 1)
+  oldSP <- gets @MachineState sp
+  x <- readMem oldSP
+  let newSP = oldSP + 1
+  modify @MachineState (& #sp .~ newSP)
   pure x
 
 pushStack :: Machine sig m => Int -> m ()
 pushStack x = do
-  s <- gets @MachineState sp
-  modify @MachineState (& #sp -~ 1)
-  writeMem s x
+  oldSP <- gets @MachineState sp
+  let newSP = oldSP - 1
+  modify @MachineState (& #sp .~ newSP)
+  writeMem newSP x
 
 b2i :: Bool -> Int
 b2i False = 0
@@ -176,10 +182,14 @@ executeInstruction (IJMPZ k) = do
   x <- popStack
   when (x == 0) $ modify @MachineState (& #pc +~ k)
   pure mempty
-executeInstruction IPRINT = pure . MEOutput . (<> "\n") . T.pack . show <$> popStack
+executeInstruction IPRINT = MkSem . pure . MEOutput . (<> "\n") . T.pack . show <$> popStack
 
 runProgram :: Machine sig m => m Sem
 runProgram = do
   st <- get @MachineState
-  res <- forM (st ^. #code) executeInstruction
-  pure $ mconcat $ map snd $ IM.toAscList res
+  if st ^. #pc < IM.size (st ^. #code)
+     then do
+       res <- executeInstruction $ (st ^. #code) IM.! (st ^. #pc)
+       modify @MachineState (& #pc +~ 1)
+       (res <>) <$> runProgram
+     else pure mempty

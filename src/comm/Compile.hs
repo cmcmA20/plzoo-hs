@@ -76,9 +76,10 @@ compileBE (BENot a) = do
 compileC :: Compiler sig m => Cmd -> m [Instruction]
 compileC (CNew v a w) = do
   x <- compileAE a
-  y <- local (v:) $ compileC w
-  k <- variableLocator v
-  pure $ x <> [ISET k] <> y
+  local (v:) do
+    y <- compileC w
+    k <- variableLocator v
+    pure $ x <> [ISET k] <> y
 compileC CSkip = pure [INOP]
 compileC (CPrint a) = do
   x <- compileAE a

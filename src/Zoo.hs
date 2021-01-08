@@ -9,7 +9,7 @@ import           Control.Effect.Lift
 import           Control.Effect.Reader
 import           Control.Effect.State
 import           Control.Lens
-import           Control.Monad (forever, forM_, void, when)
+import           Control.Monad (forever, forM_, unless, void, when)
 import           Data.Generics.Labels ()
 import           Data.Kind (Type)
 import           Data.Text (Text)
@@ -155,6 +155,7 @@ applyOpts = do
     modify @(LangDynamic sem ctx) (& #wrapper .~ Nothing)
   when (o ^. #nonInteractive) do
     modify @(LangDynamic sem ctx) (& #interactiveShell .~ False)
+  modify @(LangDynamic sem ctx) (& #files .~ ((,False) <$> (o ^. #fileToLoad))) -- an abomination
   where
     fullOpts :: ParserInfo Opts
     fullOpts = info (defaultOpts <**> helper)
@@ -339,7 +340,8 @@ interactivePrinter
   => m ()
 interactivePrinter = do
   rr <- gets @(LangDynamic sem ctx) (^. #environment . #replResult)
-  maybe (pure ()) (sendIO . TIO.putStrLn . T.pack . show) rr
+  let rrt = maybe "" (T.pack . show) rr
+  unless (T.null rrt) $ sendIO $ TIO.putStrLn rrt
 
 toplevel
   :: forall sem ctx cmd sig m

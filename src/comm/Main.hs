@@ -43,7 +43,11 @@ runMachine e c = (result, e)
         run $ evalState blankMachine $ runThrow @M.MachineError M.runProgram
 
 machineEffects :: M.Sem -> RuntimeAction
-machineEffects _ = RANop -- FIXME
+machineEffects (M.MkSem es) = foldr joinEffs RANop es
+  where
+    joinEffs :: M.MachineEffect -> RuntimeAction -> RuntimeAction
+    joinEffs (M.MEOutput t) RANop       = RAPrint t
+    joinEffs (M.MEOutput t) (RAPrint t')= RAPrint $ t <> t'
 
 static :: LangStatic M.Sem M.Ctx S.Cmd
 static = MkLangStatic
