@@ -26,7 +26,7 @@ static = MkLangStatic
   , options = []
   , fileParser = Nothing
   , toplevelParser = Just top
-  , rts = liftToRTS E.eval' [] }
+  , rts = liftToRTS E.eval' (const RANop) }
 
 dynamic :: LangDynamic E.Sem E.Ctx
 dynamic = MkLangDynamic

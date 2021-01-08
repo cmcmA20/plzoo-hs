@@ -1,18 +1,17 @@
--- This file contains all the common code used by the languages implemented in the PL Zoo.
+-- | This file contains all the common code used by the languages implemented in the PL Zoo.
 module Zoo where
 
 import           Control.Algebra
 import qualified Control.Concurrent              as S
 import           Control.Effect.Error
-import           Control.Effect.Exception hiding (TypeError)
+import           Control.Effect.Exception
 import           Control.Effect.Lift
 import           Control.Effect.Reader
 import           Control.Effect.State
 import           Control.Lens
-import           Control.Monad (forever, forM_, void, when)
+import           Control.Monad (forever, forM_, unless, void, when)
 import           Data.Generics.Labels ()
 import           Data.Kind (Type)
-import           Data.Maybe (fromMaybe)
 import           Data.Text (Text)
 import qualified Data.Text                       as T
 import qualified Data.Text.IO                    as TIO
@@ -74,11 +73,6 @@ showErr errName l m =
       LNowhere      -> ""
       LLocation _ _ -> " at " <> showLocation l
   in errName <> locText <> ": " <> m
-
--- newtype SyntaxError = MkSyntaxError { unSyntaxError :: Located Text }
-
--- instance Show SyntaxError where
---   show (MkSyntaxError (MkLocated m l)) = T.unpack $ showErr "Syntax error" l m
 
 data SyntaxError
   = SELex   !Location
@@ -161,6 +155,7 @@ applyOpts = do
     modify @(LangDynamic sem ctx) (& #wrapper .~ Nothing)
   when (o ^. #nonInteractive) do
     modify @(LangDynamic sem ctx) (& #interactiveShell .~ False)
+  modify @(LangDynamic sem ctx) (& #files .~ ((,False) <$> (o ^. #fileToLoad))) -- an abomination
   where
     fullOpts :: ParserInfo Opts
     fullOpts = info (defaultOpts <**> helper)
@@ -197,9 +192,6 @@ data LangStatic (sem :: Type) (ctx :: Type) (cmd :: Type) = MkLangStatic
   , rts            :: !(RTS sem ctx cmd) }
   deriving Generic
 
--- simpleEval : ctx -> cmd -> (Either LangError sem, ctx)
--- realEval : RTE sem ctx -> cmd -> (Either LangError (sem, RuntimeAction), ctx)
-
 data LangDynamic (sem :: Type) (ctx :: Type) = MkLangDynamic
   { environment      :: !(RuntimeEnv sem ctx)
   , interactiveShell :: !Bool
@@ -213,8 +205,7 @@ defaultWrapper = Just ["rlwrap", "ledit"]
 type Language sem ctx cmd sig m =
   ( Has (Reader (LangStatic sem ctx cmd)) sig m
   , Has (State (LangDynamic sem ctx)) sig m
-  , Has (Lift IO) sig m
-  )
+  , Has (Lift IO) sig m )
 
 -- TODO show usage depending on target language parser
 -- usage
@@ -235,20 +226,22 @@ liftToRTS
   :: forall sem ctx cmd
   .  Eq sem
   => Evaluator sem ctx cmd
-  -> [(sem, RuntimeAction)]
+  -> (sem -> RuntimeAction)
   -> RTS sem ctx cmd
-liftToRTS ev acts = \env c ->
-  let (r, newCtx) = ev (env ^. #context) c
+liftToRTS ev acts env c =
+  let
+    (r, newCtx) = ev (env ^. #context) c
+    newEnv = env & #context .~ newCtx
    in case r of
-     Left  e -> (Left e, env & #context .~ newCtx)
-     Right x -> (Right (x, fromMaybe RANop (lookup x acts)), env & #context .~ newCtx)
+     Left  e -> (Left e, newEnv)
+     Right x -> (Right (x, acts x), newEnv)
 
 executeRuntimeAction
   :: Language sem ctx cmd sig m
   => RuntimeAction
   -> m ()
-executeRuntimeAction RANop = pure ()
-executeRuntimeAction _     = throwIO $ MkInternalError "Not yet implemented"
+executeRuntimeAction RANop       = pure ()
+executeRuntimeAction (RAPrint t) = sendIO $ TIO.putStr t
 
 runCommand
   :: forall sem ctx cmd sig m
@@ -314,7 +307,7 @@ readToplevel p = do
     promptMore = T.replicate (T.length ln) " " <> "> "
   sendIO $ TIO.putStr prompt
   inp <- sendIO $ getMultiline promptMore
-  if not $ T.null inp
+  if inp /= "\n"
      then case p inp of
        Left  se -> printError se >> pure Nothing -- FIXME handle it higher
        Right c  -> pure $ Just c
@@ -326,8 +319,8 @@ readToplevel p = do
       if not (T.null inp) && T.last inp == '\\'
          then do
            TIO.putStr pm
-           (T.init inp <>) <$> getMultiline pm
-         else pure inp
+           ((T.init inp <> "\n") <>) <$> getMultiline pm
+         else pure $ inp <> "\n"
 
 useFile
   :: forall sem ctx cmd sig m
@@ -347,7 +340,8 @@ interactivePrinter
   => m ()
 interactivePrinter = do
   rr <- gets @(LangDynamic sem ctx) (^. #environment . #replResult)
-  maybe (pure ()) (sendIO . TIO.putStrLn . T.pack . show) rr
+  let rrt = maybe "" (T.pack . show) rr
+  unless (T.null rrt) $ sendIO $ TIO.putStrLn rrt
 
 toplevel
   :: forall sem ctx cmd sig m
