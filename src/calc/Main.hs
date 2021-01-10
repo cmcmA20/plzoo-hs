@@ -12,10 +12,10 @@ import qualified Parser as P
 import qualified Syntax as S
 import           Zoo
 
+type Clo = ()
+
 ln :: LangName
 ln = MkLangName "calc"
-
-type Clo = ()
 
 opts :: LangOpts Clo
 opts = MkLangOpts $ pure ()
@@ -28,10 +28,10 @@ toplevelParser t = case L.runAlex (T.unpack t) P.toplevel of
   Left  err -> throwError $ alexErrorToSyntaxError err
   Right x   -> pure x
 
-exec :: LangExec S.Cmd Integer E.Ctx
+exec :: LangExec S.Cmd E.Sem E.Ctx
 exec = MkLangExec E.eval
 
-pp :: LangPP Integer E.Ctx
+pp :: LangPP E.Sem E.Ctx
 pp = MkLangPP $ \i -> pure $ T.pack $ show i
 
 main :: IO ()
@@ -45,4 +45,4 @@ main
   . runReader @(Maybe (LangParser [S.Cmd])) Nothing
   . runReader exec
   . runReader pp
-  $ zooMain @() @S.Cmd @Integer @()
+  $ zooMain @Clo @S.Cmd @E.Sem @E.Ctx

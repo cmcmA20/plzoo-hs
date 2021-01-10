@@ -106,5 +106,5 @@ compileC (CWhile a w) = do
   let n = length x
   pure $ y <> [IJMPZ (n + 1)] <> x <> [IJMP (-(length y + 2 + n))]
 
-compile :: Cmd -> Either LangError [Instruction]
-compile = run . runReader @[Text] [] . runThrow @LangError . compileC
+compile :: Has (Throw LangError) sig m => Cmd -> m [Instruction]
+compile = runReader @[Text] [] . compileC

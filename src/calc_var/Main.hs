@@ -2,7 +2,7 @@ module Main where
 
 import           Control.Carrier.Lift
 import           Control.Carrier.Reader
-import           Control.Carrier.State.Strict
+import           Control.Effect.Throw
 import qualified Data.HashMap.Strict          as HM
 import           Data.Text (Text)
 import qualified Data.Text                    as T
@@ -13,31 +13,37 @@ import qualified Parser as P
 import qualified Syntax as S
 import           Zoo
 
-top :: Text -> Either SyntaxError S.Cmd
-top t =
-  let res = L.runAlex (T.unpack t) P.toplevel
-   in case res of
-     Left  err -> Left $ alexErrorToSyntaxError err
-     Right x   -> Right x
+type Clo = ()
 
-static :: LangStatic E.Sem E.Ctx S.Cmd
-static = MkLangStatic
-  { name = "calc_var"
-  , options = []
-  , fileParser = Nothing
-  , toplevelParser = Just top
-  , rts = liftToRTS E.eval' (const RANop) }
+ln :: LangName
+ln = MkLangName "calc_var"
 
-dynamic :: LangDynamic E.Sem E.Ctx
-dynamic = MkLangDynamic
-  { environment = mkRuntimeEnv HM.empty
-  , interactiveShell = True
-  , wrapper = defaultWrapper
-  , files = [] }
+opts :: LangOpts Clo
+opts = MkLangOpts $ pure ()
+
+ini :: LangInit Clo E.Ctx
+ini = MkLangInit $ const HM.empty
+
+toplevelParser :: Has (Throw SyntaxError) sig m => Text -> m S.Cmd
+toplevelParser t = case L.runAlex (T.unpack t) P.toplevel of
+  Left  err -> throwError $ alexErrorToSyntaxError err
+  Right x   -> pure x
+
+exec :: LangExec S.Cmd E.Sem E.Ctx
+exec = MkLangExec E.evalCmd
+
+pp :: LangPP E.Sem E.Ctx
+pp = MkLangPP $ \i -> pure $ T.pack $ show i
 
 main :: IO ()
 main
   = runM
-  . runReader static
-  . evalState dynamic
-  $ mainPlan @E.Sem @E.Ctx @S.Cmd
+  . runRuntimePureC
+  . runReader ln
+  . runReader opts
+  . runReader ini
+  . runReader (Just $ MkLangParser toplevelParser)
+  . runReader @(Maybe (LangParser [S.Cmd])) Nothing
+  . runReader exec
+  . runReader pp
+  $ zooMain @Clo @S.Cmd @E.Sem @E.Ctx

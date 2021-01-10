@@ -3,7 +3,6 @@ module Main where
 import           Control.Applicative
 import           Control.Carrier.Lift
 import           Control.Carrier.Reader
-import           Control.Carrier.Resumable.Resume
 import           Control.Carrier.State.Strict
 import           Control.Carrier.Throw.Either
 import           Data.Bifunctor (first)
@@ -17,51 +16,49 @@ import qualified Parser  as P
 import qualified Syntax  as S
 import           Zoo
 
-file :: Text -> Either SyntaxError [S.Cmd]
-file t =
-  let res = L.runAlex (T.unpack t) P.file
-   in case res of
-     Left  err -> Left $ alexErrorToSyntaxError err
-     Right x   -> Right x
+type Clo = ()
 
-top :: Text -> Either SyntaxError S.Cmd
-top t =
-  let res = L.runAlex (T.unpack t) P.program
-   in case res of
-     Left  err -> Left $ alexErrorToSyntaxError err
-     Right x   -> Right x
+ln :: LangName
+ln = MkLangName "comm"
 
-runMachine :: Evaluator M.Sem M.Ctx S.Cmd
-runMachine e c = (result, e)
+opts :: LangOpts Clo
+opts = MkLangOpts $ pure ()
+
+ini :: LangInit Clo M.Ctx
+ini = MkLangInit id
+
+toplevelParser :: Has (Throw SyntaxError) sig m => Text -> m S.Cmd
+toplevelParser t = case L.runAlex (T.unpack t) P.program of
+  Left  err -> throwError $ alexErrorToSyntaxError err
+  Right x   -> pure x
+
+fileParser :: Has (Throw SyntaxError) sig m => Text -> m [S.Cmd]
+fileParser t = case L.runAlex (T.unpack t) P.file of
+  Left  err -> throwError $ alexErrorToSyntaxError err
+  Right x   -> pure x
+
+exec :: LangExec S.Cmd M.Sem M.Ctx
+exec = MkLangExec \c -> do
+  p <- C.compile c
+  let blankMachine = M.mkMachineState p 64 -- TODO RAM size
+  z <- evalState blankMachine $ runThrow @M.MachineError $ M.runProgram
+  liftEither $ first translateErrors z
   where
     translateErrors :: M.MachineError -> LangError
     translateErrors = LERuntime . locate Nothing . T.pack . show
 
-    result :: Either LangError M.Sem
-    result = do
-      is <- C.compile c
-      let blankMachine = M.mkMachineState is 64
-      first translateErrors $
-        run $ evalState blankMachine $ runResumable @(Const M.MachineEffect) undefined $ runThrow @M.MachineError M.runProgram
-
-static :: LangStatic M.Sem M.Ctx S.Cmd
-static = MkLangStatic
-  { name = "comm"
-  , options = []
-  , fileParser = Just file
-  , toplevelParser = Just top
-  , rts = liftToRTS runMachine (const RANop) }
-
-dynamic :: LangDynamic M.Sem M.Ctx
-dynamic = MkLangDynamic
-  { environment = mkRuntimeEnv $ M.MkCtx 0 0
-  , interactiveShell = True
-  , wrapper = defaultWrapper
-  , files = [] }
+pp :: LangPP M.Sem M.Ctx
+pp = MkLangPP $ const $ pure ""
 
 main :: IO ()
 main
   = runM
-  . runReader static
-  . evalState dynamic
-  $ mainPlan @M.Sem @M.Ctx @S.Cmd
+  . runRuntimeIOC
+  . runReader ln
+  . runReader opts
+  . runReader ini
+  . runReader (Just $ MkLangParser toplevelParser)
+  . runReader (Just $ MkLangParser fileParser)
+  . runReader exec
+  . runReader pp
+  $ zooMain @Clo @S.Cmd @M.Sem @M.Ctx

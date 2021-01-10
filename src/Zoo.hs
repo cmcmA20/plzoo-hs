@@ -12,6 +12,7 @@ import           Control.Effect.Reader
 import           Control.Effect.State
 import           Control.Lens
 import           Control.Monad (forever, forM_, unless, void, when)
+import           Control.Monad.IO.Class (liftIO, MonadIO)
 import           Data.Coerce (coerce)
 import           Data.Generics.Labels ()
 import           Data.Kind (Type)
@@ -192,6 +193,14 @@ instance Algebra sig m => Algebra (Runtime :+: sig) (RuntimePureC m) where
   alg _   (L RRead)      c = pure $ "" <$ c
   alg _   (L (RWrite _)) c = c <$ pure ()
   alg hdl (R other)      c = MkRuntimePureC $ alg (runRuntimePureC . hdl) other c
+
+newtype RuntimeIOC (m :: Type -> Type) (a :: Type) = MkRuntimeIOC { runRuntimeIOC :: m a }
+  deriving (Applicative, Functor, Monad, MonadIO)
+
+instance (MonadIO m, Algebra sig m) => Algebra (Runtime :+: sig) (RuntimeIOC m) where
+  alg _   (L RRead)      c = (<$ c) <$> liftIO TIO.getLine
+  alg _   (L (RWrite t)) c = c <$ liftIO (TIO.putStr t)
+  alg hdl (R other)      c = MkRuntimeIOC $ alg (runRuntimeIOC . hdl) other c
 
 
 newtype LangName = MkLangName { unLangName :: Text }

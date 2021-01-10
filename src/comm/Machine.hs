@@ -7,15 +7,14 @@ module Machine where
 
 import           Control.Carrier.State.Strict
 import           Control.Carrier.Throw.Either
-import           Control.Effect.Resumable
 import           Control.Exception (Exception)
 import           Control.Lens
 import           Control.Monad (when)
 import           Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IM
-import           Data.Text (Text)
 import qualified Data.Text as T
 import           GHC.Generics (Generic)
+import           Text.Read (readMaybe)
 
 import Zoo
 
@@ -46,11 +45,13 @@ data MachineError
   = MEIllegalAddress
   | MEIllegalInstruction
   | MEZeroDivision
+  | MEInputOutput
 
 instance Show MachineError where
   show MEIllegalAddress     = "illegal address"
   show MEIllegalInstruction = "illegal instruction"
   show MEZeroDivision       = "division by zero"
+  show MEInputOutput        = "I/O"
 
 instance Exception MachineError
 
@@ -65,19 +66,11 @@ data MachineState = MkMachineState
 type Machine sig m =
   ( Has (State MachineState) sig m
   , Has (Throw MachineError) sig m
-  , Has (Resumable (Const MachineEffect)) sig m)
-
-data MachineEffect
-  = MEOutput !Text -- ^ writing to an output port
-  | MEInput -- ^ reading from an input port
-  deriving (Eq, Show)
+  , Has Runtime sig m)
 
 type Sem = ()
 
-data Ctx = MkCtx
-  { pIn :: !Int -- ^ input port
-  , pOut :: !Int } -- ^ output port
-  deriving (Eq, Show)
+type Ctx = ()
 
 mkMachineState :: [Instruction] -> Int -> MachineState
 mkMachineState prog ramSize = MkMachineState
@@ -116,7 +109,7 @@ b2i False = 0
 b2i True  = 1
 
 executeInstruction :: Machine sig m => Instruction -> m Sem
-executeInstruction INOP = pure mempty
+executeInstruction INOP = pure ()
 executeInstruction (ISET k) = do
   x <- popStack
   writeMem k x
@@ -173,9 +166,10 @@ executeInstruction (IJMPZ k) = do
   when (x == 0) $ modify @MachineState (& #pc +~ k)
 executeInstruction IPRINT = do
   x <- popStack
-  throwResumable @(Const MachineEffect) (Const $ MEOutput $ (<> "\n") $ T.pack $ show x)
+  rWrite $ (<> "\n") $ T.pack $ show x
 executeInstruction IREAD = do
-  x <- throwResumable @(Const MachineEffect) (Const MEInput)
+  x <- readMaybe . T.unpack <$> rRead >>=
+    maybeThrow MEInputOutput
   pushStack x
 
 runProgram :: Machine sig m => m Sem

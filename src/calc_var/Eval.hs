@@ -8,7 +8,6 @@ import           Control.Monad (when)
 import           Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HM
 import           Data.Text (Text)
-import           Data.Tuple (swap)
 
 import Syntax
 import Zoo
@@ -70,6 +69,3 @@ evalCmd (Definition k e) = do
   r <- eval e
   modify (HM.insert k r)
   pure r
-
-eval' :: Evaluator Sem Ctx Cmd
-eval' ctx cmd = swap $ run $ runState ctx $ runThrow @LangError $ evalCmd cmd

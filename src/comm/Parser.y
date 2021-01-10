@@ -40,7 +40,7 @@ while  { L.TWhile       }
 do     { L.TDo          }
 done   { L.TDone        }
 print  { L.TPrint       }
-read   { L.TPrint       }
+read   { L.TRead        }
 assign { L.TAssign      }
 semi   { L.TSemicolon   }
 
