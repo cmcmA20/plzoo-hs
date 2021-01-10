@@ -3,13 +3,11 @@ module Zoo where
 
 import           Control.Algebra
 import           Control.Carrier.Error.Church
+import           Control.Carrier.Reader
 import           Control.Carrier.State.Strict
 import qualified Control.Concurrent              as S
 import           Control.Effect.Exception
-import           Control.Effect.Lens
 import           Control.Effect.Lift
-import           Control.Effect.Reader
-import           Control.Effect.State
 import           Control.Lens
 import           Control.Monad (forever, forM_, unless, void, when)
 import           Control.Monad.IO.Class (liftIO, MonadIO)
@@ -23,11 +21,9 @@ import           GHC.Generics (Generic)
 import qualified GHC.IO.Exception                as S
 import           Options.Applicative
 import           Prelude hiding (readFile)
-import qualified System.Environment              as S
 import qualified System.Exit                     as S
 import qualified System.Info                     as S
 import qualified System.IO                       as S
-import qualified System.Posix.Process            as S
 import qualified System.Posix.Signals            as S
 
 {- Location helpers -}
@@ -187,7 +183,7 @@ newtype LangExec (cmd :: Type) (sem :: Type) (ctx :: Type) =
   MkLangExec { unLangExec :: forall sig m. ( Has (Throw LangError) sig m, Has (State ctx) sig m, Has Runtime sig m ) => cmd -> m sem }
 
 newtype LangPP (sem :: Type) (ctx :: Type) =
-  MkLangPP { unLangPP :: forall sig m. Has (State ctx) sig m => sem -> m Text }
+  MkLangPP { unLangPP :: forall sig m. Has (Reader ctx) sig m => sem -> m Text }
 
 type MetaRTS clo cmd sem ctx sig m =
   ( Has (Reader LangName) sig m
@@ -221,7 +217,7 @@ readToplevel
 readToplevel = do
   tlp' <- ask @(Maybe (LangParser cmd)) >>=
     maybeThrowIO (MkInternalError "This language has no toplevel.")
-  let tlp = unLangParser @cmd tlp'
+  let tlp = unLangParser tlp'
   ln <- asks @LangName unLangName
   let
     prompt     = ln <> "> "
@@ -244,7 +240,7 @@ readToplevel = do
 printResult
   :: forall sem ctx sig m
   .  ( Has (Reader (LangPP sem ctx)) sig m
-     , Has (State ctx) sig m
+     , Has (Reader ctx) sig m
      , Has (Lift IO) sig m
      , Show sem )
   => sem
@@ -272,7 +268,8 @@ toplevel = do
         runError @LangError (const $ pure ()) pure $ flip catchError (printError @LangError) do
           c <- readToplevel @clo @cmd @sem @ctx
           r <- runCommand @cmd @sem @ctx c
-          printResult @sem @ctx r
+          curCtx <- get @ctx
+          runReader curCtx $ printResult @sem @ctx r
   where
     eofMarker :: Text
     eofMarker = case S.os of
@@ -299,7 +296,7 @@ readFile
 readFile filename = do
   fp' <- ask @(Maybe (LangParser [cmd])) >>=
     maybeThrowIO (MkInternalError "This language can't load files.")
-  let fp = unLangParser @[cmd] fp'
+  let fp = unLangParser fp'
   fc <- handle dieOnIOError $ sendIO $ TIO.readFile $ T.unpack filename
   fp fc
   where

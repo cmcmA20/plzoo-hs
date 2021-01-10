@@ -1,13 +1,16 @@
 module Main where
 
-import           Control.Applicative
 import           Control.Carrier.Lift
 import           Control.Carrier.Reader
 import           Control.Carrier.State.Strict
 import           Control.Carrier.Throw.Either
+import           Control.Effect.Lens
 import           Data.Bifunctor (first)
 import           Data.Text (Text)
 import qualified Data.Text as T
+import           Data.Word (Word16)
+import           GHC.Generics (Generic)
+import           Options.Applicative
 
 import qualified Compile as C
 import qualified Lexer   as L
@@ -16,16 +19,38 @@ import qualified Parser  as P
 import qualified Syntax  as S
 import           Zoo
 
-type Clo = ()
+data Clo = MkClo
+  { ram      :: !Word16
+  , showCode :: !Bool
+  , showMem  :: !Bool }
+  deriving Generic
+
+-- wonky
+data Ctx = MkCtx
+  { clo          :: !Clo
+  , lastCompiled :: !(Maybe M.Program) }
+  deriving Generic
+
+type Sem = ()
 
 ln :: LangName
 ln = MkLangName "comm"
 
 opts :: LangOpts Clo
-opts = MkLangOpts $ pure ()
+opts = MkLangOpts $ MkClo
+  <$> option auto (long "ram"
+    <> help "RAM size"
+    <> showDefault
+    <> value 64)
+  <*> switch (long "code"
+    <> help "Print compiled code")
+  <*> switch (long "mem"
+    <> help "Print memory layout")
 
-ini :: LangInit Clo M.Ctx
-ini = MkLangInit id
+ini :: LangInit Clo Ctx
+ini = MkLangInit \o -> MkCtx
+  { clo = o
+  , lastCompiled = Nothing }
 
 toplevelParser :: Has (Throw SyntaxError) sig m => Text -> m S.Cmd
 toplevelParser t = case L.runAlex (T.unpack t) P.program of
@@ -37,18 +62,25 @@ fileParser t = case L.runAlex (T.unpack t) P.file of
   Left  err -> throwError $ alexErrorToSyntaxError err
   Right x   -> pure x
 
-exec :: LangExec S.Cmd M.Sem M.Ctx
+exec :: LangExec S.Cmd Sem Ctx
 exec = MkLangExec \c -> do
   p <- C.compile c
-  let blankMachine = M.mkMachineState p 64 -- TODO RAM size
+  assign @Ctx #lastCompiled $ Just p
+  rs <- gets @Ctx $ ram . clo
+  let blankMachine = M.mkMachineState p rs
   z <- evalState blankMachine $ runThrow @M.MachineError $ M.runProgram
   liftEither $ first translateErrors z
   where
     translateErrors :: M.MachineError -> LangError
     translateErrors = LERuntime . locate Nothing . T.pack . show
 
-pp :: LangPP M.Sem M.Ctx
-pp = MkLangPP $ const $ pure ""
+pp :: LangPP Sem Ctx
+pp = MkLangPP $ const do
+  sc <- asks $ showCode . clo
+  lc <- asks lastCompiled
+  pure if sc
+    then maybe "" (T.pack . show) lc
+    else ""
 
 main :: IO ()
 main
@@ -61,4 +93,4 @@ main
   . runReader (Just $ MkLangParser fileParser)
   . runReader exec
   . runReader pp
-  $ zooMain @Clo @S.Cmd @M.Sem @M.Ctx
+  $ zooMain @Clo @S.Cmd @Sem @Ctx

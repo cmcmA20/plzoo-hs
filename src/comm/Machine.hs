@@ -12,7 +12,10 @@ import           Control.Lens
 import           Control.Monad (when)
 import           Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IM
+import           Data.Text (Text)
 import qualified Data.Text as T
+import           Data.Word (Word16)
+import           Formatting
 import           GHC.Generics (Generic)
 import           Text.Read (readMaybe)
 
@@ -21,9 +24,9 @@ import Zoo
 -- | The machine instructions.
 data Instruction
   = INOP -- ^ no operation
-  | ISET !Int -- ^ pop from stack and store in the given location
-  | IGET !Int -- ^ push from given location onto stack
-  | IPUSH !Int -- ^ push integer constant onto stack
+  | ISET !Word16 -- ^ pop from stack and store in the given location
+  | IGET !Word16 -- ^ push from given location onto stack
+  | IPUSH !Word16 -- ^ push integer constant onto stack
   | IADD -- ^ addition
   | ISUB -- ^ subtraction
   | IMUL -- ^ multiplication
@@ -34,62 +37,88 @@ data Instruction
   | IAND -- ^ conjunction
   | IOR -- ^ disjunction
   | INOT -- ^ negation
-  | IJMP !Int -- ^ relative jump
-  | IJMPZ !Int -- ^ relative jump if zero on the stack
+  | IJMP !Word16 -- ^ relative jump
+  | IJMPZ !Word16 -- ^ relative jump if zero on the stack
   | IPRINT -- ^ pop from stack and print
   | IREAD -- ^ read and push on stack
-  deriving (Eq, Generic, Show)
+  deriving (Eq, Generic)
+
+shInst :: Text -> Word16 -> String
+shInst = formatToString ((right 6 ' ' %. stext) % " " %(left 4 '0' %. hex))
+
+instance Show Instruction where
+  show INOP = "NOP"
+  show (ISET x) = shInst "SET" x
+  show (IGET x) = shInst "GET" x
+  show (IPUSH x) = shInst "PUSH" x
+  show IADD = "ADD"
+  show ISUB = "SUB"
+  show IMUL = "MUL"
+  show IDIV = "DIV"
+  show IMOD = "MOD"
+  show IEQ = "EQ"
+  show ILT = "LT"
+  show IAND = "AND"
+  show IOR = "OR"
+  show INOT = "NOT"
+  show (IJMP x) = shInst "JMP" x
+  show (IJMPZ x) = shInst "JMPZ" x
+  show IPRINT = "PRINT"
+  show IREAD = "READ"
+
+newtype Program = MkProgram { unProgram :: IntMap Instruction }
+
+instance Show Program where
+  show (MkProgram p) = IM.foldlWithKey' (\s k i -> s <> formatToString
+    ( (left 4 '0' %. hex) % " " % shown % "\n") k i )
+    "" p
 
 -- | Machine errors.
 data MachineError
   = MEIllegalAddress
   | MEIllegalInstruction
   | MEZeroDivision
-  | MEInputOutput
+  | MEInvalidInput
 
 instance Show MachineError where
   show MEIllegalAddress     = "illegal address"
   show MEIllegalInstruction = "illegal instruction"
   show MEZeroDivision       = "division by zero"
-  show MEInputOutput        = "I/O"
+  show MEInvalidInput       = "invalid input"
 
 instance Exception MachineError
 
 -- | The state of the machine
 data MachineState = MkMachineState
-  { code :: !(IntMap Instruction) -- ^ program
-  , ram  :: !(IntMap Int) -- ^ memory
-  , pc   :: !Int -- ^ program counter
-  , sp   :: !Int } -- ^ stack pointer
+  { code :: !Program -- ^ program
+  , ram  :: !(IntMap Word16) -- ^ memory
+  , pc   :: !Word16 -- ^ program counter
+  , sp   :: !Word16 } -- ^ stack pointer
   deriving (Generic, Show)
 
 type Machine sig m =
   ( Has (State MachineState) sig m
   , Has (Throw MachineError) sig m
-  , Has Runtime sig m)
+  , Has Runtime sig m )
 
-type Sem = ()
-
-type Ctx = ()
-
-mkMachineState :: [Instruction] -> Int -> MachineState
+mkMachineState :: Program -> Word16 -> MachineState
 mkMachineState prog ramSize = MkMachineState
-  { code = IM.fromList $ zip [0..] prog
-  , ram = IM.fromList $ zip [0..] $ replicate ramSize 0
+  { code = prog
+  , ram = IM.fromList $ zip [0..] $ replicate (fromIntegral ramSize) 0
   , pc = 0
   , sp = ramSize - 1 }
 
-readMem :: Machine sig m => Int -> m Int
-readMem k = gets (IM.lookup k . ram) >>= maybeThrow MEIllegalAddress
+readMem :: Machine sig m => Word16 -> m Word16
+readMem k = gets (IM.lookup (fromIntegral k) . ram) >>= maybeThrow MEIllegalAddress
 
-writeMem :: Machine sig m => Int -> Int -> m ()
+writeMem :: Machine sig m => Word16 -> Word16 -> m ()
 writeMem k x = do
   st <- get @MachineState
-  if k < 0 || k >= IM.size (st ^. #ram)
+  if k < 0 || k >= fromIntegral (IM.size (st ^. #ram))
      then throwError MEIllegalAddress
-     else put $ st & #ram %~ IM.insert k x
+     else put $ st & #ram %~ IM.insert (fromIntegral k) x
 
-popStack :: Machine sig m => m Int
+popStack :: Machine sig m => m Word16
 popStack = do
   oldSP <- gets @MachineState sp
   x <- readMem oldSP
@@ -97,18 +126,18 @@ popStack = do
   modify @MachineState (& #sp .~ newSP)
   pure x
 
-pushStack :: Machine sig m => Int -> m ()
+pushStack :: Machine sig m => Word16 -> m ()
 pushStack x = do
   oldSP <- gets @MachineState sp
   let newSP = oldSP - 1
   modify @MachineState (& #sp .~ newSP)
   writeMem newSP x
 
-b2i :: Bool -> Int
+b2i :: Bool -> Word16
 b2i False = 0
 b2i True  = 1
 
-executeInstruction :: Machine sig m => Instruction -> m Sem
+executeInstruction :: Machine sig m => Instruction -> m ()
 executeInstruction INOP = pure ()
 executeInstruction (ISET k) = do
   x <- popStack
@@ -169,15 +198,15 @@ executeInstruction IPRINT = do
   rWrite $ (<> "\n") $ T.pack $ show x
 executeInstruction IREAD = do
   x <- readMaybe . T.unpack <$> rRead >>=
-    maybeThrow MEInputOutput
+    maybeThrow MEInvalidInput
   pushStack x
 
-runProgram :: Machine sig m => m Sem
+runProgram :: Machine sig m => m ()
 runProgram = do
   st <- get @MachineState
-  if st ^. #pc < IM.size (st ^. #code)
+  if st ^. #pc < st ^. #code . to (fromIntegral . IM.size . unProgram)
      then do
-       res <- executeInstruction $ (st ^. #code) IM.! (st ^. #pc)
+       res <- executeInstruction $ (st ^. #code . to unProgram) IM.! fromIntegral (st ^. #pc)
        modify @MachineState (& #pc +~ 1)
        (res <>) <$> runProgram
      else pure ()

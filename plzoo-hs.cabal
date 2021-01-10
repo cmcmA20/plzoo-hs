@@ -20,7 +20,6 @@ library
   build-depends:        base >= 4.13 && <4.14
                       , fused-effects >= 1.1.0.0
                       , fused-effects-exceptions
-                      , fused-effects-lens
                       , generic-lens
                       , lens
                       , optparse-applicative
@@ -103,8 +102,11 @@ executable comm
   build-depends:       array
                      , base >=4.13 && <4.14
                      , containers
+                     , formatting
                      , fused-effects
+                     , fused-effects-lens
                      , lens
+                     , optparse-applicative
                      , plzoo-hs
                      , text
   build-tool-depends:  alex:alex
@@ -114,6 +116,7 @@ executable comm
   default-extensions:  BlockArguments
                      , ConstraintKinds
                      , DeriveGeneric
+                     , DuplicateRecordFields
                      , GeneralizedNewtypeDeriving
                      , OverloadedLabels
                      , OverloadedStrings
