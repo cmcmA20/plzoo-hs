@@ -114,21 +114,14 @@ printError = sendIO . TIO.putStrLn . T.pack . show
 {- Command line options parsing -}
 
 data DefaultOpts = MkDefaultOpts
-  { wrappers       :: !(Maybe [Text])
-  , noWrapper      :: !Bool
-  , nonInteractive :: !Bool
+  { nonInteractive :: !Bool
   , onlyLangInfo   :: !Bool
-  , fileToLoad     :: ![Text] }
+  , filesToLoad    :: ![Text] }
   deriving (Generic, Show)
 
 defaultOpts :: Parser DefaultOpts
 defaultOpts = MkDefaultOpts
-  <$> optional (many (strOption ( long "wrapper"
-    <> metavar "WRAPPER"
-    <> help "Specify a command-line wrapper to be used (such as rlwrap or ledit)" )))
-  <*> switch (long "no-wrapper"
-    <> help "Do not use a command-line wrapper")
-  <*> switch (short 'n'
+  <$> switch (short 'n'
     <> help "Do not run the interactive toplevel")
   <*> switch (short 'v'
     <> help "Print language information and exit")
@@ -149,30 +142,6 @@ parseOpts = do
       (  fullDesc
       <> progDesc "Too many levels of abstraction"
       <> header "The Programming Languages Zoo" )
-
--- applyOpts
---   :: forall sem ctx cmd sig m
---   .  Language sem ctx cmd sig m
---   => m ()
--- applyOpts = do
---   o <- sendIO $ execParser fullOpts
---   when (o ^. #onlyLangInfo) do
---     ln <- asks @(LangStatic sem ctx cmd m) name
---     sendIO do
---       TIO.putStrLn $ ln <> " (" <> T.pack S.os <> ")"
---       S.exitSuccess
---   modify @(LangDynamic sem ctx) (& #wrapper %~ (o ^. #wrappers <>))
---   when (o ^. #noWrapper) do
---     modify @(LangDynamic sem ctx) (& #wrapper .~ Nothing)
---   when (o ^. #nonInteractive) do
---     modify @(LangDynamic sem ctx) (& #interactiveShell .~ False)
---   modify @(LangDynamic sem ctx) (& #files .~ ((,False) <$> (o ^. #fileToLoad))) -- an abomination
---   where
---     fullOpts :: ParserInfo Opts
---     fullOpts = info (defaultOpts <**> helper)
---       (  fullDesc
---       <> progDesc "exists s t. Lang s -> Lang t"
---       <> header "The Programming Languages Zoo" )
 
 {- Core -}
 
@@ -250,9 +219,9 @@ readToplevel
      , Has (Throw SyntaxError) sig m )
   => m cmd
 readToplevel = do
-  tlp <- ask @(Maybe (LangParser cmd)) >>=
+  tlp' <- ask @(Maybe (LangParser cmd)) >>=
     maybeThrowIO (MkInternalError "This language has no toplevel.")
-  let tlp' = unLangParser @cmd tlp
+  let tlp = unLangParser @cmd tlp'
   ln <- asks @LangName unLangName
   let
     prompt     = ln <> "> "
@@ -261,7 +230,7 @@ readToplevel = do
   inp <- sendIO $ getMultiline promptMore
   if T.all (== '\n') inp
      then readToplevel @clo @cmd @sem @ctx
-     else tlp' inp
+     else tlp inp
   where
     getMultiline :: Text -> IO Text
     getMultiline pm = do
@@ -320,6 +289,35 @@ toplevel = do
         S.EOF -> sendIO S.exitSuccess
         _     -> throwIO ioe
 
+readFile
+  :: forall cmd sig m
+  .  ( Has (Reader (Maybe (LangParser [cmd]))) sig m
+     , Has (Throw SyntaxError) sig m
+     , Has (Lift IO) sig m )
+  => Text
+  -> m [cmd]
+readFile filename = do
+  fp' <- ask @(Maybe (LangParser [cmd])) >>=
+    maybeThrowIO (MkInternalError "This language can't load files.")
+  let fp = unLangParser @[cmd] fp'
+  fc <- handle dieOnIOError $ sendIO $ TIO.readFile $ T.unpack filename
+  fp fc
+  where
+    dieOnIOError :: IOError -> m Text
+    dieOnIOError = throwIO . MkInternalError . T.pack . show
+
+useFile
+  :: forall clo cmd sem ctx sig m
+  .  ( MetaRTS clo cmd sem ctx sig m
+     , Has (State ctx) sig m )
+  => Text
+  -> m ()
+useFile filename =
+  runError @SyntaxError (const $ pure ()) pure $ flip catchError (printError @SyntaxError) do
+    cs  <- readFile @cmd filename
+    runError @LangError (const $ pure ()) pure $ flip catchError (printError @LangError) $
+      forM_ cs $ runCommand @cmd @sem @ctx
+
 zooMain
   :: forall clo cmd sem ctx sig m
   .  ( MetaRTS clo cmd sem ctx sig m
@@ -330,52 +328,15 @@ zooMain = do
     myTid <- S.myThreadId
     void $ S.installHandler S.keyboardSignal (S.Catch $ S.throwTo myTid UserInterrupt) Nothing
     S.hSetBuffering S.stdout S.NoBuffering
-  (opts, _) <- parseOpts
-  initState <- asks @(LangInit clo ctx) unLangInit
-  evalState (initState opts) $ toplevel @clo @cmd @sem @ctx
 
--- addFile
---   :: forall sem ctx sig m
---   .  Has (State (LangDynamic sem ctx)) sig m
---   => Bool
---   -> Text
---   -> m ()
--- addFile interactive filename =
---   modify @(LangDynamic sem ctx) (& #files %~ ( (filename, interactive) : ))
--- 
--- -- TODO use anonymous arguments?
--- -- anonymous
--- --   :: forall env sig m
--- --   .  Has (State (LangDynamic env)) sig m
--- --   => Text
--- --   -> m ()
--- -- anonymous t = do
--- --   addFile @env True t
--- --   modify @(LangDynamic env) (& #interactiveShell .~ False)
--- 
--- readFile
---   :: forall sem ctx cmd sig m
---   .  Language sem ctx cmd sig m
---   => (Text -> Either SyntaxError [cmd])
---   -> Text
---   -> m [cmd]
--- readFile p filename = do
---   fc <- handle dieOnIOError $ sendIO $ TIO.readFile $ T.unpack filename
---   case p fc of
---     Left  se -> printError se >> pure [] -- FIXME handle it higher
---     Right cs -> pure cs
---   where
---     dieOnIOError :: IOError -> m Text
---     dieOnIOError = throwIO . MkInternalError . T.pack . show
--- 
--- useFile
---   :: forall sem ctx cmd sig m
---   .  Language sem ctx cmd sig m
---   => (Text, Bool)
---   -> m ()
--- useFile (filename, _) = do
---   flp <- asks @(LangStatic sem ctx cmd m) fileParser >>=
---     maybeThrowIO (MkInternalError "This language can't load files.")
---   cs  <- readFile @sem @ctx @cmd flp filename
---   forM_ cs $ runCommand @sem @ctx
--- 
+  (opts, defOpts) <- parseOpts
+  when (defOpts ^. #onlyLangInfo) do
+    ln <- asks unLangName
+    sendIO do
+      TIO.putStrLn $ ln <> " (" <> T.pack S.os <> ")"
+      S.exitSuccess
+
+  initState <- asks @(LangInit clo ctx) unLangInit
+  evalState (initState opts) $ forM_ (defOpts ^. #filesToLoad) $ useFile @clo @cmd @sem @ctx
+  unless (defOpts ^. #nonInteractive) $
+    evalState (initState opts) $ toplevel @clo @cmd @sem @ctx
