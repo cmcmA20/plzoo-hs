@@ -84,6 +84,9 @@ compileC CSkip = pure [INOP]
 compileC (CPrint a) = do
   x <- compileAE a
   pure $ x <> [IPRINT]
+compileC (CRead v) = do
+  k <- variableLocator v
+  pure [IREAD, ISET k]
 compileC (CAssign v a) = do
   x <- compileAE a
   k <- variableLocator v

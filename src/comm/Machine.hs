@@ -7,6 +7,7 @@ module Machine where
 
 import           Control.Carrier.State.Strict
 import           Control.Carrier.Throw.Either
+import           Control.Effect.Resumable
 import           Control.Exception (Exception)
 import           Control.Lens
 import           Control.Monad (when)
@@ -37,6 +38,7 @@ data Instruction
   | IJMP !Int -- ^ relative jump
   | IJMPZ !Int -- ^ relative jump if zero on the stack
   | IPRINT -- ^ pop from stack and print
+  | IREAD -- ^ read and push on stack
   deriving (Eq, Generic, Show)
 
 -- | Machine errors.
@@ -62,27 +64,27 @@ data MachineState = MkMachineState
 
 type Machine sig m =
   ( Has (State MachineState) sig m
-  , Has (Throw MachineError) sig m )
+  , Has (Throw MachineError) sig m
+  , Has (Resumable (Const MachineEffect)) sig m)
 
 data MachineEffect
   = MEOutput !Text -- ^ writing to an output port
+  | MEInput -- ^ reading from an input port
   deriving (Eq, Show)
 
--- | Machine semantics
-newtype Sem = MkSem { unSem :: [MachineEffect] }
-  deriving (Eq, Monoid, Semigroup)
+type Sem = ()
 
-instance Show Sem where
-  show _ = ""
-
-type Ctx = ()
+data Ctx = MkCtx
+  { pIn :: !Int -- ^ input port
+  , pOut :: !Int } -- ^ output port
+  deriving (Eq, Show)
 
 mkMachineState :: [Instruction] -> Int -> MachineState
 mkMachineState prog ramSize = MkMachineState
   { code = IM.fromList $ zip [0..] prog
   , ram = IM.fromList $ zip [0..] $ replicate ramSize 0
   , pc = 0
-  , sp = ramSize - 1}
+  , sp = ramSize - 1 }
 
 readMem :: Machine sig m => Int -> m Int
 readMem k = gets (IM.lookup k . ram) >>= maybeThrow MEIllegalAddress
@@ -118,71 +120,63 @@ executeInstruction INOP = pure mempty
 executeInstruction (ISET k) = do
   x <- popStack
   writeMem k x
-  pure mempty
 executeInstruction (IGET k) = do
   x <- readMem k
   pushStack x
-  pure mempty
 executeInstruction (IPUSH x) = pushStack x >> pure mempty
 executeInstruction IADD = do
   y <- popStack
   x <- popStack
   pushStack $ x + y
-  pure mempty
 executeInstruction ISUB = do
   y <- popStack
   x <- popStack
   pushStack $ x - y
-  pure mempty
 executeInstruction IMUL = do
   y <- popStack
   x <- popStack
   pushStack $ x * y
-  pure mempty
 executeInstruction IDIV = do
   y <- popStack
   x <- popStack
   if y == 0
      then throwError MEZeroDivision
      else pushStack $ x `div` y
-  pure mempty
 executeInstruction IMOD = do
   y <- popStack
   x <- popStack
   if y == 0
      then throwError MEZeroDivision
      else pushStack $ x `mod` y
-  pure mempty
 executeInstruction IEQ = do
   y <- popStack
   x <- popStack
   pushStack $ b2i $ x == y
-  pure mempty
 executeInstruction ILT = do
   y <- popStack
   x <- popStack
   pushStack $ b2i $ x < y
-  pure mempty
 executeInstruction IAND = do
   y <- popStack
   x <- popStack
   pushStack $ b2i $ x /= 0 && y /= 0
-  pure mempty
 executeInstruction IOR = do
   y <- popStack
   x <- popStack
   pushStack $ b2i $ x /= 0 || y /= 0
-  pure mempty
 executeInstruction INOT = do
   x <- popStack
   pushStack $ b2i $ x == 0
-  pure mempty
 executeInstruction (IJMP k) = modify @MachineState (& #pc +~ k) >> pure mempty
 executeInstruction (IJMPZ k) = do
   x <- popStack
   when (x == 0) $ modify @MachineState (& #pc +~ k)
-  pure mempty
-executeInstruction IPRINT = MkSem . pure . MEOutput . (<> "\n") . T.pack . show <$> popStack
+executeInstruction IPRINT = do
+  x <- popStack
+  throwResumable @(Const MachineEffect) (Const $ MEOutput $ (<> "\n") $ T.pack $ show x)
+executeInstruction IREAD = do
+  x <- throwResumable @(Const MachineEffect) (Const MEInput)
+  pushStack x
 
 runProgram :: Machine sig m => m Sem
 runProgram = do
@@ -192,4 +186,4 @@ runProgram = do
        res <- executeInstruction $ (st ^. #code) IM.! (st ^. #pc)
        modify @MachineState (& #pc +~ 1)
        (res <>) <$> runProgram
-     else pure mempty
+     else pure ()

@@ -2,20 +2,23 @@
 module Zoo where
 
 import           Control.Algebra
+import           Control.Carrier.Error.Church
+import           Control.Carrier.State.Strict
 import qualified Control.Concurrent              as S
-import           Control.Effect.Error
 import           Control.Effect.Exception
+import           Control.Effect.Lens
 import           Control.Effect.Lift
 import           Control.Effect.Reader
 import           Control.Effect.State
 import           Control.Lens
 import           Control.Monad (forever, forM_, unless, void, when)
+import           Data.Coerce (coerce)
 import           Data.Generics.Labels ()
 import           Data.Kind (Type)
 import           Data.Text (Text)
 import qualified Data.Text                       as T
 import qualified Data.Text.IO                    as TIO
-import           GHC.Generics
+import           GHC.Generics (Generic)
 import qualified GHC.IO.Exception                as S
 import           Options.Applicative
 import           Prelude hiding (readFile)
@@ -104,20 +107,12 @@ instance Show LangError where
 
 instance Exception LangError
 
-printError :: (Has (Lift IO) sig m, Exception e) => e -> m ()
+printError :: forall e sig m. (Has (Lift IO) sig m, Exception e) => e -> m ()
 printError = sendIO . TIO.putStrLn . T.pack . show
-
--- is it even needed?
--- showWithParens :: Integer -> Integer -> (a -> Text) -> (a -> Text)
--- showWithParens maxLevel atLevel p =
---   if maxLevel < atLevel
---      then \x -> "(" <> p x <> ")"
---      else p
 
 {- Command line options parsing -}
 
--- TODO parametric parser
-data Opts = MkOpts
+data DefaultOpts = MkDefaultOpts
   { wrappers       :: !(Maybe [Text])
   , noWrapper      :: !Bool
   , nonInteractive :: !Bool
@@ -125,8 +120,8 @@ data Opts = MkOpts
   , fileToLoad     :: ![Text] }
   deriving (Generic, Show)
 
-defaultOpts :: Parser Opts
-defaultOpts = MkOpts
+defaultOpts :: Parser DefaultOpts
+defaultOpts = MkDefaultOpts
   <$> optional (many (strOption ( long "wrapper"
     <> metavar "WRAPPER"
     <> help "Specify a command-line wrapper to be used (such as rlwrap or ledit)" )))
@@ -139,179 +134,125 @@ defaultOpts = MkOpts
   <*> many (strOption (short 'l'
     <> help "Load file into the initial environment"))
 
-applyOpts
-  :: forall sem ctx cmd sig m
-  .  Language sem ctx cmd sig m
-  => m ()
-applyOpts = do
-  o <- sendIO $ execParser fullOpts
-  when (o ^. #onlyLangInfo) do
-    ln <- asks @(LangStatic sem ctx cmd) name
-    sendIO do
-      TIO.putStrLn $ ln <> " (" <> T.pack S.os <> ")"
-      S.exitSuccess
-  modify @(LangDynamic sem ctx) (& #wrapper %~ (o ^. #wrappers <>))
-  when (o ^. #noWrapper) do
-    modify @(LangDynamic sem ctx) (& #wrapper .~ Nothing)
-  when (o ^. #nonInteractive) do
-    modify @(LangDynamic sem ctx) (& #interactiveShell .~ False)
-  modify @(LangDynamic sem ctx) (& #files .~ ((,False) <$> (o ^. #fileToLoad))) -- an abomination
+parseOpts
+  :: forall clo sig m
+  .  ( Has (Reader (LangOpts clo)) sig m
+     , Has (Lift IO) sig m )
+  => m (clo, DefaultOpts)
+parseOpts = do
+  po <- asks @(LangOpts clo) unLangOpts
+  sendIO $ execParser $ fullOptInfo po
   where
-    fullOpts :: ParserInfo Opts
-    fullOpts = info (defaultOpts <**> helper)
+    fullOptInfo :: Parser a -> ParserInfo (a, DefaultOpts)
+    fullOptInfo p = info (liftA2 (,) p defaultOpts <**> helper)
       (  fullDesc
-      <> progDesc "exists s t. Lang s -> Lang t"
+      <> progDesc "Too many levels of abstraction"
       <> header "The Programming Languages Zoo" )
+
+-- applyOpts
+--   :: forall sem ctx cmd sig m
+--   .  Language sem ctx cmd sig m
+--   => m ()
+-- applyOpts = do
+--   o <- sendIO $ execParser fullOpts
+--   when (o ^. #onlyLangInfo) do
+--     ln <- asks @(LangStatic sem ctx cmd m) name
+--     sendIO do
+--       TIO.putStrLn $ ln <> " (" <> T.pack S.os <> ")"
+--       S.exitSuccess
+--   modify @(LangDynamic sem ctx) (& #wrapper %~ (o ^. #wrappers <>))
+--   when (o ^. #noWrapper) do
+--     modify @(LangDynamic sem ctx) (& #wrapper .~ Nothing)
+--   when (o ^. #nonInteractive) do
+--     modify @(LangDynamic sem ctx) (& #interactiveShell .~ False)
+--   modify @(LangDynamic sem ctx) (& #files .~ ((,False) <$> (o ^. #fileToLoad))) -- an abomination
+--   where
+--     fullOpts :: ParserInfo Opts
+--     fullOpts = info (defaultOpts <**> helper)
+--       (  fullDesc
+--       <> progDesc "exists s t. Lang s -> Lang t"
+--       <> header "The Programming Languages Zoo" )
 
 {- Core -}
 
-data RuntimeAction
-  = RANop
-  | RAPrint !Text
-  deriving Generic
+data Runtime (m :: Type -> Type) (k :: Type) where
+  RRead :: Runtime m Text
+  RWrite :: Text -> Runtime m ()
 
-data RuntimeEnv (sem :: Type) (ctx :: Type) = MkRuntimeEnv
-  { context    :: !ctx
-  , replResult :: !(Maybe sem) }
-  deriving Generic
+rRead :: Has Runtime sig m => m Text
+rRead = send RRead
 
-mkRuntimeEnv :: ctx -> RuntimeEnv sem ctx
-mkRuntimeEnv g = MkRuntimeEnv {context = g, replResult = Nothing}
+rWrite :: Has Runtime sig m => Text -> m ()
+rWrite = send . RWrite
 
-type Evaluator (sem :: Type) (ctx :: Type) (cmd :: Type) =
-  ctx -> cmd -> (Either LangError sem, ctx)
+newtype RuntimePureC (m :: Type -> Type) (a :: Type) = MkRuntimePureC { runRuntimePureC :: m a }
+  deriving (Applicative, Functor, Monad)
 
-type RTS (sem :: Type) (ctx :: Type) (cmd :: Type) =
-  RuntimeEnv sem ctx -> cmd -> (Either LangError (sem, RuntimeAction), RuntimeEnv sem ctx)
+instance Algebra sig m => Algebra (Runtime :+: sig) (RuntimePureC m) where
+  alg _   (L RRead)      c = pure $ "" <$ c
+  alg _   (L (RWrite _)) c = c <$ pure ()
+  alg hdl (R other)      c = MkRuntimePureC $ alg (runRuntimePureC . hdl) other c
 
-data LangStatic (sem :: Type) (ctx :: Type) (cmd :: Type) = MkLangStatic
-  { name           :: !Text
-  , options        :: ![(Text, Text, Text)] -- FIXME it's useless now
-  , fileParser     :: !(Maybe (Text -> Either SyntaxError [cmd])) -- better safe than sorry
-  , toplevelParser :: !(Maybe (Text -> Either SyntaxError cmd))
-  , rts            :: !(RTS sem ctx cmd) }
-  deriving Generic
 
-data LangDynamic (sem :: Type) (ctx :: Type) = MkLangDynamic
-  { environment      :: !(RuntimeEnv sem ctx)
-  , interactiveShell :: !Bool
-  , wrapper          :: !(Maybe [Text])
-  , files            :: ![(Text, Bool)] }
-  deriving Generic
+newtype LangName = MkLangName { unLangName :: Text }
 
-defaultWrapper :: Maybe [Text]
-defaultWrapper = Just ["rlwrap", "ledit"]
+newtype LangOpts (clo :: Type) =
+  MkLangOpts { unLangOpts :: Parser clo }
 
-type Language sem ctx cmd sig m =
-  ( Has (Reader (LangStatic sem ctx cmd)) sig m
-  , Has (State (LangDynamic sem ctx)) sig m
+newtype LangInit (clo :: Type) (ctx :: Type) =
+  MkLangInit { unLangInit :: clo -> ctx }
+
+newtype LangParser (cmd :: Type) =
+  MkLangParser { unLangParser :: forall sig m. Has (Throw SyntaxError) sig m => Text -> m cmd }
+
+newtype LangExec (cmd :: Type) (sem :: Type) (ctx :: Type) =
+  MkLangExec { unLangExec :: forall sig m. ( Has (Throw LangError) sig m, Has (State ctx) sig m, Has Runtime sig m ) => cmd -> m sem }
+
+newtype LangPP (sem :: Type) (ctx :: Type) =
+  MkLangPP { unLangPP :: forall sig m. Has (State ctx) sig m => sem -> m Text }
+
+type MetaRTS clo cmd sem ctx sig m =
+  ( Has (Reader LangName) sig m
+  , Has (Reader (LangOpts clo)) sig m
+  , Has (Reader (LangInit clo ctx)) sig m
+  , Has (Reader (Maybe (LangParser cmd))) sig m
+  , Has (Reader (Maybe (LangParser [cmd]))) sig m
+  , Has (Reader (LangExec cmd sem ctx)) sig m
+  , Has (Reader (LangPP sem ctx)) sig m
+  , Has Runtime sig m
   , Has (Lift IO) sig m )
 
--- TODO show usage depending on target language parser
--- usage
---   :: forall env cmd sig m
---   .  Language env cmd sig m
---   => m Text
--- usage = do
---   fp <- asks @(LangStatic env cmd) fileParser
---   ln <- T.pack <$> sendIO S.getProgName
---   pure $ "Usage: " <> ln <> " [option] ..." <> case fp of
---     Nothing -> ""
---     Just _  -> " [file] ..."
-
-{- Meta RTS -}
-
--- feels wonky
-liftToRTS
-  :: forall sem ctx cmd
-  .  Eq sem
-  => Evaluator sem ctx cmd
-  -> (sem -> RuntimeAction)
-  -> RTS sem ctx cmd
-liftToRTS ev acts env c =
-  let
-    (r, newCtx) = ev (env ^. #context) c
-    newEnv = env & #context .~ newCtx
-   in case r of
-     Left  e -> (Left e, newEnv)
-     Right x -> (Right (x, acts x), newEnv)
-
-executeRuntimeAction
-  :: Language sem ctx cmd sig m
-  => RuntimeAction
-  -> m ()
-executeRuntimeAction RANop       = pure ()
-executeRuntimeAction (RAPrint t) = sendIO $ TIO.putStr t
 
 runCommand
-  :: forall sem ctx cmd sig m
-  .  Language sem ctx cmd sig m
+  :: forall cmd sem ctx sig m
+  .  ( Has (Reader (LangExec cmd sem ctx)) sig m
+     , Has (State ctx) sig m
+     , Has Runtime sig m
+     , Has (Throw LangError) sig m )
   => cmd
-  -> m (Maybe sem)
+  -> m sem
 runCommand c = do
-  oldEnv <- gets @(LangDynamic sem ctx) environment
-  ex <- asks @(LangStatic sem ctx cmd) rts
-  let (res, newEnv) = ex oldEnv c
-  modify @(LangDynamic sem ctx) (& #environment .~ newEnv)
-  case res of
-    Left  le      -> do
-      printError le -- FIXME handle it higher
-      pure Nothing
-    Right (e, ra) -> do
-      executeRuntimeAction @sem @ctx @cmd ra
-      pure $ Just e
-
-addFile
-  :: forall sem ctx sig m
-  .  Has (State (LangDynamic sem ctx)) sig m
-  => Bool
-  -> Text
-  -> m ()
-addFile interactive filename =
-  modify @(LangDynamic sem ctx) (& #files %~ ( (filename, interactive) : ))
-
--- TODO use anonymous arguments?
--- anonymous
---   :: forall env sig m
---   .  Has (State (LangDynamic env)) sig m
---   => Text
---   -> m ()
--- anonymous t = do
---   addFile @env True t
---   modify @(LangDynamic env) (& #interactiveShell .~ False)
-
-readFile
-  :: forall sem ctx cmd sig m
-  .  Language sem ctx cmd sig m
-  => (Text -> Either SyntaxError [cmd])
-  -> Text
-  -> m [cmd]
-readFile p filename = do
-  fc <- handle dieOnIOError $ sendIO $ TIO.readFile $ T.unpack filename
-  case p fc of
-    Left  se -> printError se >> pure [] -- FIXME handle it higher
-    Right cs -> pure cs
-  where
-    dieOnIOError :: IOError -> m Text
-    dieOnIOError = throwIO . MkInternalError . T.pack . show
+  ex <- asks @(LangExec cmd sem ctx) unLangExec
+  ex c
 
 readToplevel
-  :: forall sem ctx cmd sig m
-  .  Language sem ctx cmd sig m
-  => (Text -> Either SyntaxError cmd)
-  -> m (Maybe cmd)
-readToplevel p = do
-  ln <- asks @(LangStatic sem ctx cmd) name
+  :: forall clo cmd sem ctx sig m
+  .  ( MetaRTS clo cmd sem ctx sig m
+     , Has (Throw SyntaxError) sig m )
+  => m cmd
+readToplevel = do
+  tlp <- ask @(Maybe (LangParser cmd)) >>=
+    maybeThrowIO (MkInternalError "This language has no toplevel.")
+  let tlp' = unLangParser @cmd tlp
+  ln <- asks @LangName unLangName
   let
     prompt     = ln <> "> "
     promptMore = T.replicate (T.length ln) " " <> "> "
   sendIO $ TIO.putStr prompt
   inp <- sendIO $ getMultiline promptMore
   if T.all (== '\n') inp
-     then pure Nothing
-     else case p inp of
-       Left  se -> printError se >> pure Nothing -- FIXME handle it higher
-       Right c  -> pure $ Just c
+     then readToplevel @clo @cmd @sem @ctx
+     else tlp' inp
   where
     getMultiline :: Text -> IO Text
     getMultiline pm = do
@@ -322,50 +263,38 @@ readToplevel p = do
            ((T.init inp <> "\n") <>) <$> getMultiline pm
          else pure $ inp <> "\n"
 
-useFile
-  :: forall sem ctx cmd sig m
-  .  Language sem ctx cmd sig m
-  => (Text, Bool)
-  -> m ()
-useFile (filename, _) = do
-  flp <- asks @(LangStatic sem ctx cmd) fileParser >>=
-    maybeThrowIO (MkInternalError "This language can't load files.")
-  cs  <- readFile @sem @ctx @cmd flp filename
-  forM_ cs $ runCommand @sem @ctx
-
-interactivePrinter
-  :: forall sem ctx cmd sig m
-  .  ( Language sem ctx cmd sig m
+printResult
+  :: forall sem ctx sig m
+  .  ( Has (Reader (LangPP sem ctx)) sig m
+     , Has (State ctx) sig m
+     , Has (Lift IO) sig m
      , Show sem )
-  => m ()
-interactivePrinter = do
-  rr <- gets @(LangDynamic sem ctx) (^. #environment . #replResult)
-  let rrt = maybe "" (T.pack . show) rr
+  => sem
+  -> m ()
+printResult v = do
+  pp <- asks @(LangPP sem ctx) unLangPP
+  rrt <- pp v
   unless (T.null rrt) $ sendIO $ TIO.putStrLn rrt
 
 toplevel
-  :: forall sem ctx cmd sig m
-  .  ( Language sem ctx cmd sig m
+  :: forall clo cmd sem ctx sig m
+  .  ( MetaRTS clo cmd sem ctx sig m
+     , Has (State ctx) sig m
      , Show sem )
   => m ()
 toplevel = do
-  tlp <- asks @(LangStatic sem ctx cmd) toplevelParser >>=
-    maybeThrowIO (MkInternalError "This language has no toplevel.")
-  languageName <- asks @(LangStatic sem ctx cmd) name
+  languageName <- coerce <$> ask @LangName
   sendIO $ TIO.putStrLn
     $  languageName <> " -- programming languages zoo\n"
     <> "Type " <> eofMarker <> " to exit."
   forever $ flip catches
     [ Handler handleUserInterrupt
     , Handler gracefulEOF
-    ] do
-        mc <- readToplevel @sem @ctx tlp
-        case mc of
-          Nothing -> modify @(LangDynamic sem ctx) (& #environment . #replResult .~ Nothing)
-          Just c  -> do
-            r <- runCommand @sem @ctx c
-            modify @(LangDynamic sem ctx) (& #environment . #replResult .~ r)
-        interactivePrinter @sem @ctx @cmd
+    ] $ runError @SyntaxError (const $ pure ()) pure $ flip catchError (printError @SyntaxError) $
+        runError @LangError (const $ pure ()) pure $ flip catchError (printError @LangError) do
+          c <- readToplevel @clo @cmd @sem @ctx
+          r <- runCommand @cmd @sem @ctx c
+          printResult @sem @ctx r
   where
     eofMarker :: Text
     eofMarker = case S.os of
@@ -382,26 +311,62 @@ toplevel = do
         S.EOF -> sendIO S.exitSuccess
         _     -> throwIO ioe
 
-mainPlan
-  :: forall sem ctx cmd sig m
-  .  ( Language sem ctx cmd sig m
+zooMain
+  :: forall clo cmd sem ctx sig m
+  .  ( MetaRTS clo cmd sem ctx sig m
      , Show sem )
   => m ()
-mainPlan = do
+zooMain = do
   sendIO do
     myTid <- S.myThreadId
     void $ S.installHandler S.keyboardSignal (S.Catch $ S.throwTo myTid UserInterrupt) Nothing
     S.hSetBuffering S.stdout S.NoBuffering
-  applyOpts @sem @ctx @cmd -- TODO parametric parser
-  interactive <- gets @(LangDynamic sem ctx) interactiveShell
-  mwr <- gets @(LangDynamic sem ctx) wrapper
-  when interactive do
-    flip (maybe (pure ())) mwr \wrs -> do
-      myPath  <- sendIO S.getExecutablePath
-      newArgs <- (++ ["--no-wrapper"]) <$> sendIO S.getArgs
-      forM_ wrs \w ->
-        handle @IOError (const $ pure ()) $ void $ sendIO $
-          S.executeFile (T.unpack w) True (myPath : newArgs) Nothing
-  fs <- reverse <$> gets @(LangDynamic sem ctx) files
-  forM_ fs $ useFile @sem @ctx @cmd
-  when interactive $ toplevel @sem @ctx @cmd
+  (opts, _) <- parseOpts
+  initState <- asks @(LangInit clo ctx) unLangInit
+  evalState (initState opts) $ toplevel @clo @cmd @sem @ctx
+
+-- addFile
+--   :: forall sem ctx sig m
+--   .  Has (State (LangDynamic sem ctx)) sig m
+--   => Bool
+--   -> Text
+--   -> m ()
+-- addFile interactive filename =
+--   modify @(LangDynamic sem ctx) (& #files %~ ( (filename, interactive) : ))
+-- 
+-- -- TODO use anonymous arguments?
+-- -- anonymous
+-- --   :: forall env sig m
+-- --   .  Has (State (LangDynamic env)) sig m
+-- --   => Text
+-- --   -> m ()
+-- -- anonymous t = do
+-- --   addFile @env True t
+-- --   modify @(LangDynamic env) (& #interactiveShell .~ False)
+-- 
+-- readFile
+--   :: forall sem ctx cmd sig m
+--   .  Language sem ctx cmd sig m
+--   => (Text -> Either SyntaxError [cmd])
+--   -> Text
+--   -> m [cmd]
+-- readFile p filename = do
+--   fc <- handle dieOnIOError $ sendIO $ TIO.readFile $ T.unpack filename
+--   case p fc of
+--     Left  se -> printError se >> pure [] -- FIXME handle it higher
+--     Right cs -> pure cs
+--   where
+--     dieOnIOError :: IOError -> m Text
+--     dieOnIOError = throwIO . MkInternalError . T.pack . show
+-- 
+-- useFile
+--   :: forall sem ctx cmd sig m
+--   .  Language sem ctx cmd sig m
+--   => (Text, Bool)
+--   -> m ()
+-- useFile (filename, _) = do
+--   flp <- asks @(LangStatic sem ctx cmd m) fileParser >>=
+--     maybeThrowIO (MkInternalError "This language can't load files.")
+--   cs  <- readFile @sem @ctx @cmd flp filename
+--   forM_ cs $ runCommand @sem @ctx
+-- 

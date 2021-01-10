@@ -1,7 +1,9 @@
 module Main where
 
+import           Control.Applicative
 import           Control.Carrier.Lift
 import           Control.Carrier.Reader
+import           Control.Carrier.Resumable.Resume
 import           Control.Carrier.State.Strict
 import           Control.Carrier.Throw.Either
 import           Data.Bifunctor (first)
@@ -40,14 +42,7 @@ runMachine e c = (result, e)
       is <- C.compile c
       let blankMachine = M.mkMachineState is 64
       first translateErrors $
-        run $ evalState blankMachine $ runThrow @M.MachineError M.runProgram
-
-machineEffects :: M.Sem -> RuntimeAction
-machineEffects (M.MkSem es) = foldr joinEffs RANop es
-  where
-    joinEffs :: M.MachineEffect -> RuntimeAction -> RuntimeAction
-    joinEffs (M.MEOutput t) RANop       = RAPrint t
-    joinEffs (M.MEOutput t) (RAPrint t')= RAPrint $ t <> t'
+        run $ evalState blankMachine $ runResumable @(Const M.MachineEffect) undefined $ runThrow @M.MachineError M.runProgram
 
 static :: LangStatic M.Sem M.Ctx S.Cmd
 static = MkLangStatic
@@ -55,11 +50,11 @@ static = MkLangStatic
   , options = []
   , fileParser = Just file
   , toplevelParser = Just top
-  , rts = liftToRTS runMachine machineEffects }
+  , rts = liftToRTS runMachine (const RANop) }
 
 dynamic :: LangDynamic M.Sem M.Ctx
 dynamic = MkLangDynamic
-  { environment = mkRuntimeEnv ()
+  { environment = mkRuntimeEnv $ M.MkCtx 0 0
   , interactiveShell = True
   , wrapper = defaultWrapper
   , files = [] }

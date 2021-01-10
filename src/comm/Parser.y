@@ -40,6 +40,7 @@ while  { L.TWhile       }
 do     { L.TDo          }
 done   { L.TDone        }
 print  { L.TPrint       }
+read   { L.TPrint       }
 assign { L.TAssign      }
 semi   { L.TSemicolon   }
 
@@ -63,6 +64,7 @@ Command :: { S.Cmd }
   : skip { S.CSkip }
   | new var assign ArExp in Command { S.CNew $2 $4 $6 }
   | print ArExp { S.CPrint $2 }
+  | read var { S.CRead $2 }
   | var assign ArExp { S.CAssign $1 $3 }
   | Command semi Command { S.CSeq $1 $3 }
   | while BoolExp do Command done { S.CWhile $2 $4 }

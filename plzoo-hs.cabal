@@ -18,8 +18,9 @@ library
   exposed-modules:      Zoo
   other-modules:
   build-depends:        base >= 4.13 && <4.14
-                      , fused-effects
+                      , fused-effects >= 1.1.0.0
                       , fused-effects-exceptions
+                      , fused-effects-lens
                       , generic-lens
                       , lens
                       , optparse-applicative
@@ -30,15 +31,24 @@ library
   default-extensions:   AllowAmbiguousTypes
                       , BlockArguments
                       , ConstraintKinds
-                      , DuplicateRecordFields
+                      , DeriveFunctor
                       , DeriveGeneric
+                      , DuplicateRecordFields
+                      , FlexibleInstances
+                      , GADTs
+                      , GeneralizedNewtypeDeriving
+                      , InstanceSigs
                       , KindSignatures
+                      , MultiParamTypeClasses
                       , OverloadedLabels
                       , OverloadedStrings
                       , RankNTypes
                       , ScopedTypeVariables
+                      , StandaloneDeriving
                       , TupleSections
                       , TypeApplications
+                      , TypeOperators
+                      , UndecidableInstances
                       , ViewPatterns
   ghc-options:         -Wall
 

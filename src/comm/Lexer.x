@@ -31,6 +31,7 @@ tokens :-
   "do"      { tok TDo }
   "done"    { tok TDone }
   "print"   { tok TPrint }
+  "read"    { tok TRead }
   "new"     { tok TNew }
   "in"      { tok TIn }
   "and"     { tok TAnd }
@@ -63,6 +64,7 @@ data Token
   | TDo
   | TDone
   | TPrint
+  | TRead
   | TNew
   | TIn
   | TAnd

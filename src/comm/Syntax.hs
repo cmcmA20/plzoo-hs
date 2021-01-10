@@ -30,6 +30,7 @@ data Cmd
   = CSkip -- ^ no operation [skip]
   | CNew !Text !ArExp !Cmd -- ^ variable declaration [new x := e in c]
   | CPrint !ArExp -- ^ print expression [print e]
+  | CRead !Text -- ^ read expression into variable [read x]
   | CAssign !Text !ArExp -- ^ assign a variable [x := e]
   | CSeq !Cmd !Cmd -- ^ sequence commands [c1 ; c2]
   | CWhile !BoolExp !Cmd -- ^ loop [while b do c done]
