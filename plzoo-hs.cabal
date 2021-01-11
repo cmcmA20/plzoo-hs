@@ -118,3 +118,27 @@ executable comm
                      , TupleSections
                      , TypeApplications
   ghc-options:         -Wall
+
+executable lambda
+  main-is:             Main.hs
+  other-modules:       Syntax
+  build-depends:       array
+                     , base >=4.13 && <4.14
+                     , fin
+                     , fused-effects
+                     , plzoo-hs
+                     , singletons
+                     , text
+  build-tool-depends:  alex:alex
+                     , happy:happy
+  hs-source-dirs:      src/lambda
+  default-language:    Haskell2010
+  default-extensions:  DataKinds
+                     , GADTs
+                     , KindSignatures
+                     , OverloadedStrings
+                     , RankNTypes
+                     , ScopedTypeVariables
+                     , TypeApplications
+                     , ViewPatterns
+  ghc-options:         -Wall
