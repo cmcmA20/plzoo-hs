@@ -6,7 +6,6 @@ import           Control.Carrier.Error.Church
 import           Control.Carrier.Reader
 import           Control.Carrier.State.Strict
 import qualified Control.Concurrent              as S
-import           Control.Effect.Error
 import           Control.Effect.Exception hiding (TypeError)
 import           Control.Effect.Lift
 import           Control.Lens
@@ -15,7 +14,6 @@ import           Control.Monad.IO.Class (liftIO, MonadIO)
 import           Data.Coerce (coerce)
 import           Data.Generics.Labels ()
 import           Data.Kind (Type)
-import           Data.Maybe (fromMaybe)
 import           Data.Text (Text)
 import qualified Data.Text                       as T
 import qualified Data.Text.IO                    as TIO
