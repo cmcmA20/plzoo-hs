@@ -1,7 +1,7 @@
 cabal-version:       3.0
 
 name:                plzoo-hs
-version:             0.2.0.0
+version:             0.3.0.0
 synopsis:            The Programming Languages Zoo
 -- description:
 -- bug-reports:
@@ -32,18 +32,15 @@ library
                       , ConstraintKinds
                       , DeriveFunctor
                       , DeriveGeneric
-                      , DuplicateRecordFields
                       , FlexibleInstances
                       , GADTs
                       , GeneralizedNewtypeDeriving
-                      , InstanceSigs
                       , KindSignatures
                       , MultiParamTypeClasses
                       , OverloadedLabels
                       , OverloadedStrings
                       , RankNTypes
                       , ScopedTypeVariables
-                      , StandaloneDeriving
                       , TupleSections
                       , TypeApplications
                       , TypeOperators
@@ -104,7 +101,6 @@ executable comm
                      , containers
                      , formatting
                      , fused-effects
-                     , fused-effects-lens
                      , lens
                      , optparse-applicative
                      , plzoo-hs

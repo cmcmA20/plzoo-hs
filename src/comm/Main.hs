@@ -4,7 +4,7 @@ import           Control.Carrier.Lift
 import           Control.Carrier.Reader
 import           Control.Carrier.State.Strict
 import           Control.Carrier.Throw.Either
-import           Control.Effect.Lens
+import           Control.Lens
 import           Data.Bifunctor (first)
 import           Data.Text (Text)
 import qualified Data.Text as T
@@ -21,8 +21,8 @@ import           Zoo
 
 data Clo = MkClo
   { ram      :: !Word16
-  , showCode :: !Bool
-  , showMem  :: !Bool }
+  , showCode :: !Bool }
+--   , showMem  :: !Bool } NYI
   deriving Generic
 
 -- wonky
@@ -44,8 +44,8 @@ opts = MkLangOpts $ MkClo
     <> value 64)
   <*> switch (long "code"
     <> help "Print compiled code")
-  <*> switch (long "mem"
-    <> help "Print memory layout")
+--   <*> switch (long "mem"
+--     <> help "Print memory layout")
 
 ini :: LangInit Clo Ctx
 ini = MkLangInit \o -> MkCtx
@@ -65,7 +65,7 @@ fileParser t = case L.runAlex (T.unpack t) P.file of
 exec :: LangExec S.Cmd Sem Ctx
 exec = MkLangExec \c -> do
   p <- C.compile c
-  assign @Ctx #lastCompiled $ Just p
+  modify @Ctx (& #lastCompiled ?~ p)
   rs <- gets @Ctx $ ram . clo
   let blankMachine = M.mkMachineState p rs
   z <- evalState blankMachine $ runThrow @M.MachineError $ M.runProgram

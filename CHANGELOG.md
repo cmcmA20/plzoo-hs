@@ -1,5 +1,12 @@
 # Revision history for plzoo-hs
 
+## 0.3.0.0 -- 2021-01-11
+
+* Languages can have non-trivial effect interleaving.
+
+Released languages:
+* comm
+
 ## 0.2.0.0 -- 2021-01-07
 
 * Basic framework for any language is ready.
