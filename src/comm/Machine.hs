@@ -44,7 +44,7 @@ data Instruction
   deriving (Eq, Generic)
 
 shInst :: Text -> Word16 -> String
-shInst = formatToString ((right 6 ' ' %. stext) % " " %(left 4 '0' %. hex))
+shInst = formatToString ((right 6 ' ' %. stext) % " " % "0x" %(left 4 '0' %. hex))
 
 instance Show Instruction where
   show INOP = "NOP"
@@ -70,7 +70,7 @@ newtype Program = MkProgram { unProgram :: IntMap Instruction }
 
 instance Show Program where
   show (MkProgram p) = IM.foldlWithKey' (\s k i -> s <> formatToString
-    ( (left 4 '0' %. hex) % " " % shown % "\n") k i )
+    ( "0x" % (left 4 '0' %. hex) % " " % shown % "\n") k i )
     "" p
 
 -- | Machine errors.
@@ -195,7 +195,10 @@ executeInstruction (IJMPZ k) = do
   when (x == 0) $ modify @MachineState (& #pc +~ k)
 executeInstruction IPRINT = do
   x <- popStack
-  rWrite $ (<> "\n") $ T.pack $ show x
+  rWrite $ (<> "\n") $ T.pack $
+    if x >= 32768
+       then "-" <> show (65536 - fromIntegral @Word16 @Int x)
+       else show $ fromIntegral @Word16 @Int x
 executeInstruction IREAD = do
   x <- readMaybe . T.unpack <$> rRead >>=
     maybeThrow MEInvalidInput

@@ -104,8 +104,21 @@ instance Show LangError where
 
 instance Exception LangError
 
-printError :: forall e sig m. (Has (Lift IO) sig m, Exception e) => e -> m ()
+printError
+  :: forall e sig m
+  .  ( Exception e
+     , Has (Lift IO) sig m )
+  => e
+  -> m ()
 printError = sendIO . TIO.putStrLn . T.pack . show
+
+defaultErrorHandler
+  :: forall e sig m
+  .  ( Exception e
+     , Has (Lift IO) sig m )
+  => ErrorC e m ()
+  -> m ()
+defaultErrorHandler = runError @e (const $ pure ()) pure . flip catchError (printError @e)
 
 {- Command line options parsing -}
 
@@ -264,8 +277,7 @@ toplevel = do
   forever $ flip catches
     [ Handler handleUserInterrupt
     , Handler gracefulEOF
-    ] $ runError @SyntaxError (const $ pure ()) pure $ flip catchError (printError @SyntaxError) $
-        runError @LangError (const $ pure ()) pure $ flip catchError (printError @LangError) do
+    ] $ defaultErrorHandler @SyntaxError $ defaultErrorHandler @LangError do
           c <- readToplevel @clo @cmd @sem @ctx
           r <- runCommand @cmd @sem @ctx c
           curCtx <- get @ctx
@@ -310,9 +322,9 @@ useFile
   => Text
   -> m ()
 useFile filename =
-  runError @SyntaxError (const $ pure ()) pure $ flip catchError (printError @SyntaxError) do
+  defaultErrorHandler @SyntaxError do
     cs  <- readFile @cmd filename
-    runError @LangError (const $ pure ()) pure $ flip catchError (printError @LangError) $
+    defaultErrorHandler @LangError $
       forM_ cs $ runCommand @cmd @sem @ctx
 
 zooMain
