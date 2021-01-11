@@ -6,7 +6,7 @@ import           Control.Carrier.Error.Church
 import           Control.Carrier.Reader
 import           Control.Carrier.State.Strict
 import qualified Control.Concurrent              as S
-import           Control.Effect.Exception hiding (TypeError)
+import           Control.Effect.Exception
 import           Control.Effect.Lift
 import           Control.Lens
 import           Control.Monad (forever, forM_, unless, void, when)
@@ -147,7 +147,7 @@ parseOpts = do
   sendIO $ execParser $ fullOptInfo po
   where
     fullOptInfo :: Parser a -> ParserInfo (a, DefaultOpts)
-    fullOptInfo p = info (liftA2 (,) p defaultOpts <**> helper)
+    fullOptInfo p = info (((,) <$> p <*> defaultOpts) <**> helper)
       (  fullDesc
       <> progDesc "Too many levels of abstraction"
       <> header "The Programming Languages Zoo" )
