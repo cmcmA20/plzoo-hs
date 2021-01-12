@@ -17,7 +17,7 @@ extra-source-files:  CHANGELOG.md, README.md
 library
   exposed-modules:      Zoo
   other-modules:
-  build-depends:        base >= 4.13 && <4.14
+  build-depends:        base >= 4.14 && <4.15
                       , fused-effects >= 1.1.0.0
                       , fused-effects-exceptions
                       , generic-lens
@@ -54,7 +54,7 @@ executable calc
                      , Parser
                      , Syntax
   build-depends:       array
-                     , base >=4.13 && <4.14
+                     , base >=4.14 && <4.15
                      , fused-effects
                      , lens
                      , plzoo-hs
@@ -74,7 +74,7 @@ executable calc_var
                      , Parser
                      , Syntax
   build-depends:       array
-                     , base >=4.13 && <4.14
+                     , base >=4.14 && <4.15
                      , fused-effects
                      , lens
                      , plzoo-hs
@@ -96,7 +96,7 @@ executable comm
                      , Parser
                      , Syntax
   build-depends:       array
-                     , base >=4.13 && <4.14
+                     , base >=4.14 && <4.15
                      , containers
                      , formatting
                      , fused-effects
@@ -121,12 +121,11 @@ executable comm
 
 executable lambda
   main-is:             Main.hs
-  other-modules:       Syntax
+  other-modules:       Lexer
+                     , Syntax
   build-depends:       array
-                     , base >=4.13 && <4.14
-                     , fin
+                     , base >=4.14 && <4.15
                      , fused-effects
-                     , plzoo-hs
                      , singletons
                      , text
   build-tool-depends:  alex:alex
@@ -135,10 +134,9 @@ executable lambda
   default-language:    Haskell2010
   default-extensions:  DataKinds
                      , GADTs
-                     , KindSignatures
-                     , OverloadedStrings
-                     , RankNTypes
                      , ScopedTypeVariables
+                     , StandaloneKindSignatures
+                     , TemplateHaskell
                      , TypeApplications
-                     , ViewPatterns
+                     , TypeFamilies
   ghc-options:         -Wall

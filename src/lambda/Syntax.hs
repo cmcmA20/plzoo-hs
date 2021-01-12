@@ -2,30 +2,64 @@
 module Syntax where
 
 import Data.Kind (Type)
-import Data.Maybe (fromMaybe)
+import Data.Singletons.TH (genSingletons, sing, SingI, withSingI)
 import Data.Text (Text)
-import Numeric.Natural
 
-import GHC.TypeLits (Nat)
+-- import Zoo
 
-import Zoo
-
--- | Locally nameless but Haskell has no deptypes
-data Term'' where
-  TFree  :: Text -> Term''
-  TBound :: Natural -> Term''
-  TLam   :: Term'' -> Term''
-  TApp   :: Term'' -> Term'' -> Term''
+data Nat :: Type where
+  Z :: Nat
+  S :: Nat -> Nat
   deriving (Eq, Show)
+
+genSingletons [''Nat]
+
+data Fin :: Nat -> Type where
+  FZ :: forall (n :: Nat). Fin ('S n)
+  FS :: forall (n :: Nat). Fin n -> Fin ('S n)
+
+instance Eq (Fin n) where
+  FZ   == FZ    = True
+  FS k == FS k' = k == k'
+  _    == _     = False
+
+instance Show (Fin n) where
+  show FZ     = "FZ"
+  show (FS k) = "FS " <> show k
+
+weakenFin :: forall (n :: Nat). Fin n -> Fin ('S n)
+weakenFin FZ     = FZ
+weakenFin (FS k) = FS (weakenFin k)
+
+data Term :: Nat -> Type where
+  TFree  :: forall (n :: Nat). Text -> Term n
+  TBound :: forall (n :: Nat). Fin n -> Term n
+  TLam   :: forall (n :: Nat). Term ('S n) -> Term n
+  TApp   :: forall (n :: Nat). Term n -> Term n -> Term n
+  deriving (Eq, Show)
+
+weakenCtx :: forall (n :: Nat). Term n -> Term ('S n)
+weakenCtx (TFree name) = TFree name
+weakenCtx (TBound idx) = TBound (weakenFin idx)
+weakenCtx (TLam body ) = TLam (weakenCtx body)
+weakenCtx (TApp u v  ) = TApp (weakenCtx u) (weakenCtx v)
+
+decOut :: forall (n :: Nat). SingI n => Fin ('S n) -> Maybe (Fin n)
+decOut k = case sing @n of
+  SZ    -> Nothing
+  SS n' -> case k of
+    FZ    -> Just FZ
+    FS k' -> case withSingI n' decOut k' of
+      Nothing -> Nothing
+      Just x  -> Just (FS x)
+
+substOut :: forall (n :: Nat). SingI n => Term n -> Term ('S n) -> Term n
+substOut _   (TFree name) = TFree name
+substOut rep (TBound idx) = maybe rep TBound (decOut idx)
+substOut rep (TLam body ) = TLam (substOut (weakenCtx rep) body)
+substOut rep (TApp u v  ) = TApp (substOut rep u) (substOut rep v)
 
 -- newtype Term = MkTerm { unTerm :: Located Term' }
 -- 
 -- instance Eq Term where
 --   MkTerm (MkLocated x _) == MkTerm (MkLocated y _) = x == y
-
--- substOut :: Term' -> Term' -> Term'
--- substOut _   (TFree 0 n ) = error "waiting for -XDependentTypes"
--- substOut _   (TFree l n ) = TFree (l - 1) n
--- substOut rep (TBound l i) = fromMaybe rep (decOut (TBound i))
--- substOut rep (TLam l t  ) = TLam $ substOut (weaken rep) t
--- substOut rep (TApp l s t) = TApp (substOut rep s) (substOut rep t)
