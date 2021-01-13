@@ -26,6 +26,9 @@ ini = MkLangInit $ const $ Cmd.MkExCtx
 toplevelParser :: Has (Throw SyntaxError) sig m => Text -> m Cmd.Cmd
 toplevelParser = undefined -- FIXME
 
+fileParser :: Has (Throw SyntaxError) sig m => Text -> m [Cmd.Cmd]
+fileParser = undefined -- FIXME
+
 exec :: LangExec Cmd.Cmd Cmd.Sem Cmd.ExCtx
 exec = MkLangExec Cmd.evalCmd
 
@@ -44,7 +47,7 @@ main
   . runReader opts
   . runReader ini
   . runReader (Just $ MkLangParser toplevelParser)
-  . runReader @(Maybe (LangParser [Cmd.Cmd])) Nothing
+  . runReader (Just $ MkLangParser fileParser)
   . runReader exec
   . runReader pp
   $ zooMain @Clo @Cmd.Cmd @Cmd.Sem @Cmd.ExCtx
