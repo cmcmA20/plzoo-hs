@@ -121,21 +121,29 @@ executable comm
 
 executable lambda
   main-is:             Main.hs
-  other-modules:       Lexer
+  other-modules:       Command
+                     , Context
+                     , Lexer
                      , Normalize
                      , Syntax
   build-depends:       array
                      , base >=4.14 && <4.15
                      , fused-effects
+                     , lens
                      , plzoo-hs
                      , singletons
                      , text
+                     , unordered-containers
   build-tool-depends:  alex:alex
                      , happy:happy
   hs-source-dirs:      src/lambda
   default-language:    Haskell2010
-  default-extensions:  DataKinds
+  default-extensions:  BlockArguments
+                     , ConstraintKinds
+                     , DataKinds
+                     , DeriveGeneric
                      , GADTs
+                     , OverloadedLabels
                      , OverloadedStrings
                      , ScopedTypeVariables
                      , StandaloneKindSignatures
