@@ -74,6 +74,7 @@ substOut rep (TLam body ) = TLam (substOut (weakenCtx rep) body)
 substOut rep (TApp u v  ) = TApp (substOut rep u) (substOut rep v)
 
 newtype Term = MkTerm { unTerm :: Term' 'Z }
+  deriving Show
 
 -- newtype Term' = MkTerm' { unTerm' :: Located Term'' }
 -- 
