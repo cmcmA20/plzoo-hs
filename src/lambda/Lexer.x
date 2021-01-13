@@ -11,8 +11,8 @@ $alpha  = [a-zA-Z]
 $digit  = 0-9
 $symbol = [\' \! \@ \$ \% \& \* \- \+ \| \\ \[ \] \{ \} \, \< \= \> \? \/ \~ \`]
 
-@name    = [$alpha $symbol] [$alpha $digit $symbol]*
-@index   = [$digit]+
+@name    = [$alpha $digit $symbol]+
+@index   = \_ [$digit]+
 @comment = "--" .* \n
 
 tokens :-
@@ -33,7 +33,6 @@ tokens :-
   \(          { tok TLParen }
   \)          { tok TRParen }
   ":="        { tok TColonEq }
-  \.          { tok TPeriod }
   [\^ \λ]     { tok TLambda }
   \;          { tok TSemi }
 
@@ -52,7 +51,6 @@ data Token
   | TLParen
   | TRParen
   | TColonEq
-  | TPeriod
   | TLambda
   | TSemi
   | TEOF

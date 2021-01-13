@@ -15,8 +15,6 @@ import qualified Lexer as L
 %token
 %%
 
-
-
 {
 parseError :: L.Token -> L.Alex a
 parseError _ = do
