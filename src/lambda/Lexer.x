@@ -21,7 +21,7 @@ tokens :-
   \n          ;
   [\  \r \t]+ ;
   @name       { \(_,_,_,s) len -> pure (TName (T.pack (take len s))) }
-  @index      { \(_,_,_,s) len -> pure (TIndex (read (take len s))) }
+  @index      { \(_,_,_,s) len -> pure (TIndex (read (take (len-1) (tail s)))) }
   ":context"  { tok TContext }
   ":help"     { tok THelp }
   ":quit"     { tok TQuit }
@@ -61,6 +61,13 @@ tok t (_, _, _, _) _ = pure t
 
 alexEOF :: Alex Token
 alexEOF = pure TEOF
+
+alexScanAll :: Alex [Token]
+alexScanAll = do
+  x <- alexMonadScan
+  case x of
+    TEOF -> pure [TEOF]
+    _    -> (x:) <$> alexScanAll
 
 lexwrap :: (Token -> Alex a) -> Alex a
 lexwrap = (alexMonadScan >>=)
