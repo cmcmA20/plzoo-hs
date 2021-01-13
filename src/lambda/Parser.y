@@ -5,13 +5,17 @@ import qualified Syntax as S
 import qualified Lexer as L
 }
 
-%name FIXME
+%name toplevel Toplevel
+%name file File
 %error { parseError }
 %lexer { L.lexwrap } { L.TEOF }
 %monad { L.Alex }
 %tokentype { L.Token }
 
 %token
+%%
+
+
 
 {
 parseError :: L.Token -> L.Alex a
