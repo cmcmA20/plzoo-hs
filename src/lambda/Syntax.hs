@@ -4,6 +4,7 @@ module Syntax where
 import Data.Kind (Type)
 import Data.Singletons.TH (genSingletons, sing, SingI, withSingI)
 import Data.Text (Text)
+import qualified Data.Text as T
 
 -- import Zoo
 
@@ -24,21 +25,34 @@ instance Eq (Fin n) where
   _    == _     = False
 
 instance Show (Fin n) where
-  show FZ     = "FZ"
-  show (FS k) = "FS " <> show k
+  show FZ      = "FZ"
+  show (FS FZ) = "FS FZ"
+  show (FS k ) = "FS (" <> show k <> ")"
 
 weakenFin :: forall (n :: Nat). Fin n -> Fin ('S n)
 weakenFin FZ     = FZ
 weakenFin (FS k) = FS (weakenFin k)
 
-data Term :: Nat -> Type where
-  TFree  :: forall (n :: Nat). Text -> Term n
-  TBound :: forall (n :: Nat). Fin n -> Term n
-  TLam   :: forall (n :: Nat). Term ('S n) -> Term n
-  TApp   :: forall (n :: Nat). Term n -> Term n -> Term n
-  deriving (Eq, Show)
+data Term' :: Nat -> Type where
+  TFree  :: forall (n :: Nat). Text -> Term' n
+  TBound :: forall (n :: Nat). Fin n -> Term' n
+  TLam   :: forall (n :: Nat). Term' ('S n) -> Term' n
+  TApp   :: forall (n :: Nat). Term' n -> Term' n -> Term' n
+  deriving Eq
 
-weakenCtx :: forall (n :: Nat). Term n -> Term ('S n)
+instance Show (Term' n) where
+  show (TFree name) = T.unpack name
+  show (TBound k  ) = showFin' 0 k
+    where
+    showFin' :: Integer -> Fin m -> String
+    showFin' n FZ     = show n
+    showFin' n (FS j) = showFin' (1 + n) j
+  show (TLam body ) = "λ." <> show body
+  show (TApp (TLam body) v) = "(λ." <> show body <> ") " <> show v
+  show (TApp u (TApp v w) ) = show u <> " (" <> show (TApp v w) <> ")"
+  show (TApp u v          ) = show u <> " " <> show v
+
+weakenCtx :: forall (n :: Nat). Term' n -> Term' ('S n)
 weakenCtx (TFree name) = TFree name
 weakenCtx (TBound idx) = TBound (weakenFin idx)
 weakenCtx (TLam body ) = TLam (weakenCtx body)
@@ -53,13 +67,15 @@ decOut k = case sing @n of
       Nothing -> Nothing
       Just x  -> Just (FS x)
 
-substOut :: forall (n :: Nat). SingI n => Term n -> Term ('S n) -> Term n
+substOut :: forall (n :: Nat). SingI n => Term' n -> Term' ('S n) -> Term' n
 substOut _   (TFree name) = TFree name
 substOut rep (TBound idx) = maybe rep TBound (decOut idx)
 substOut rep (TLam body ) = TLam (substOut (weakenCtx rep) body)
 substOut rep (TApp u v  ) = TApp (substOut rep u) (substOut rep v)
 
--- newtype Term = MkTerm { unTerm :: Located Term' }
+newtype Term = MkTerm { unTerm :: Term' 'Z }
+
+-- newtype Term' = MkTerm' { unTerm' :: Located Term'' }
 -- 
--- instance Eq Term where
---   MkTerm (MkLocated x _) == MkTerm (MkLocated y _) = x == y
+-- instance Eq Term' where
+--   MkTerm' (MkLocated x _) == MkTerm' (MkLocated y _) = x == y
