@@ -24,6 +24,9 @@ laOmega = TLam $ TApp laHmm laHmm
 laWtf :: Term' 'Z
 laWtf = TLam $ TApp (TApp (TBound FZ) (TBound FZ)) (TBound FZ)
 
+laDerp :: Term' 'Z
+laDerp = TApp (TLam (TFree "derp")) laWtf
+
 normalize'
   :: forall n sig m
   . ( SingI n
@@ -46,3 +49,6 @@ normalize' (TApp s t  ) = do
   case s' of
     TLam body -> pure $ substOut t' body
     _         -> pure $ TApp s' t'
+
+normalize :: ( Has (Reader Depth) sig m, Has (Reader Energy) sig m ) => Term -> m Term
+normalize (MkTerm t) = MkTerm <$> normalize' t

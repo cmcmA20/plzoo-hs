@@ -155,8 +155,12 @@ parseOpts = do
 {- Core -}
 
 data Runtime (m :: Type -> Type) (k :: Type) where
+  RExit :: Runtime m ()
   RRead :: Runtime m Text
   RWrite :: Text -> Runtime m ()
+
+rExit :: Has Runtime sig m => m ()
+rExit = send RExit
 
 rRead :: Has Runtime sig m => m Text
 rRead = send RRead
@@ -168,6 +172,7 @@ newtype RuntimePureC (m :: Type -> Type) (a :: Type) = MkRuntimePureC { runRunti
   deriving (Applicative, Functor, Monad)
 
 instance Algebra sig m => Algebra (Runtime :+: sig) (RuntimePureC m) where
+  alg _   (L RExit)      c = c <$ pure () -- FIXME is it right?
   alg _   (L RRead)      c = pure $ "" <$ c
   alg _   (L (RWrite _)) c = c <$ pure ()
   alg hdl (R other)      c = MkRuntimePureC $ alg (runRuntimePureC . hdl) other c
@@ -176,6 +181,7 @@ newtype RuntimeIOC (m :: Type -> Type) (a :: Type) = MkRuntimeIOC { runRuntimeIO
   deriving (Applicative, Functor, Monad, MonadIO)
 
 instance (MonadIO m, Algebra sig m) => Algebra (Runtime :+: sig) (RuntimeIOC m) where
+  alg _   (L RExit)      c = c <$ liftIO S.exitSuccess
   alg _   (L RRead)      c = (<$ c) <$> liftIO TIO.getLine
   alg _   (L (RWrite t)) c = c <$ liftIO (TIO.putStr t)
   alg hdl (R other)      c = MkRuntimeIOC $ alg (runRuntimeIOC . hdl) other c
