@@ -22,6 +22,14 @@ tokens :-
   [\  \r \t]+ ;
   @name       { \(_,_,_,s) len -> pure (TName (T.pack (take len s))) }
   @index      { \(_,_,_,s) len -> pure (TIndex (read (take len s))) }
+  ":context"  { tok TContext }
+  ":help"     { tok THelp }
+  ":quit"     { tok TQuit }
+  ":constant" { tok TConstant }
+  ":eager"    { tok TEager }
+  ":lazy"     { tok TLazy }
+  ":deep"     { tok TDeep }
+  ":shallow"  { tok TShallow }
   \(          { tok TLParen }
   \)          { tok TRParen }
   ":="        { tok TColonEq }
@@ -33,6 +41,14 @@ tokens :-
 data Token
   = TName !Text
   | TIndex !Integer
+  | TContext
+  | THelp
+  | TQuit
+  | TConstant
+  | TEager
+  | TLazy
+  | TDeep
+  | TShallow
   | TLParen
   | TRParen
   | TColonEq
