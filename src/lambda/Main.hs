@@ -5,10 +5,13 @@ import           Control.Carrier.Reader
 import           Control.Effect.Throw
 import           Data.Text (Text)
 import qualified Data.Text as T
+import           Text.Megaparsec
 
 import qualified Command as Cmd
 import qualified Context as Con
+import qualified Lexer as L
 import qualified Normalize as N
+import qualified Parser as P
 import           Zoo
 
 type Clo = ()
@@ -24,7 +27,7 @@ ini = MkLangInit $ const $ Cmd.MkExCtx
   { Cmd.energy = N.ELazy, Cmd.depth = N.DShallow, Cmd.ctx = Con.empty }
 
 toplevelParser :: Has (Throw SyntaxError) sig m => Text -> m Cmd.Cmd
-toplevelParser = undefined -- FIXME
+toplevelParser t = undefined
 
 fileParser :: Has (Throw SyntaxError) sig m => Text -> m [Cmd.Cmd]
 fileParser = undefined -- FIXME

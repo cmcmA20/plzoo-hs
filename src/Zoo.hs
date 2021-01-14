@@ -29,15 +29,16 @@ import qualified System.Posix.Signals            as S
 {- Location helpers -}
 
 data Location
-  = LNowhere -- No location
-  | LLocation !Integer !Integer -- Delimited location (line, column)
-  deriving (Generic, Show)
+  = LNowhere -- ^ No location
+  | LLocation !Integer !Integer -- ^ Delimited location (line, column)
+  deriving (Eq, Generic, Ord, Show)
 
 showLocation :: Location -> Text
 showLocation LNowhere        = "unknown location"
 showLocation (LLocation r c) = "line " <> T.pack (show r) <> ", column " <> T.pack (show c)
 
-data Located (a :: Type) = MkLocated
+type Located :: Type -> Type
+data Located a = MkLocated
   { content :: !a
   , loc     :: !Location }
   deriving (Generic, Show)
@@ -77,6 +78,7 @@ showErr errName l m =
 data SyntaxError
   = SELex   !Location
   | SEParse !Location
+  deriving (Eq, Ord)
 
 instance Show SyntaxError where
   show (SELex   lo) = T.unpack $ showErr "Syntax error" lo "lexical error"
@@ -154,9 +156,13 @@ parseOpts = do
 
 {- Core -}
 
-data Runtime (m :: Type -> Type) (k :: Type) where
-  RExit :: Runtime m ()
-  RRead :: Runtime m Text
+type SigKind     = (Type -> Type) -> Type -> Type
+type CarrierKind = Type -> Type
+
+type Runtime :: CarrierKind -> Type -> Type
+data Runtime m k where
+  RExit  :: Runtime m ()
+  RRead  :: Runtime m Text
   RWrite :: Text -> Runtime m ()
 
 rExit :: Has Runtime sig m => m ()
@@ -168,7 +174,7 @@ rRead = send RRead
 rWrite :: Has Runtime sig m => Text -> m ()
 rWrite = send . RWrite
 
-newtype RuntimePureC (m :: Type -> Type) (a :: Type) = MkRuntimePureC { runRuntimePureC :: m a }
+newtype RuntimePureC (m :: CarrierKind) (a :: Type) = MkRuntimePureC { runRuntimePureC :: m a }
   deriving (Applicative, Functor, Monad)
 
 instance Algebra sig m => Algebra (Runtime :+: sig) (RuntimePureC m) where
@@ -177,7 +183,7 @@ instance Algebra sig m => Algebra (Runtime :+: sig) (RuntimePureC m) where
   alg _   (L (RWrite _)) c = c <$ pure ()
   alg hdl (R other)      c = MkRuntimePureC $ alg (runRuntimePureC . hdl) other c
 
-newtype RuntimeIOC (m :: Type -> Type) (a :: Type) = MkRuntimeIOC { runRuntimeIOC :: m a }
+newtype RuntimeIOC (m :: CarrierKind) (a :: Type) = MkRuntimeIOC { runRuntimeIOC :: m a }
   deriving (Applicative, Functor, Monad, MonadIO)
 
 instance (MonadIO m, Algebra sig m) => Algebra (Runtime :+: sig) (RuntimeIOC m) where
@@ -187,24 +193,33 @@ instance (MonadIO m, Algebra sig m) => Algebra (Runtime :+: sig) (RuntimeIOC m) 
   alg hdl (R other)      c = MkRuntimeIOC $ alg (runRuntimeIOC . hdl) other c
 
 
-newtype LangName = MkLangName { unLangName :: Text }
+newtype LangName = MkLangName { unLangName
+  :: Text }
 
-newtype LangOpts (clo :: Type) =
-  MkLangOpts { unLangOpts :: Parser clo }
+newtype LangOpts (clo :: Type) = MkLangOpts { unLangOpts
+  :: Parser clo }
 
-newtype LangInit (clo :: Type) (ctx :: Type) =
-  MkLangInit { unLangInit :: clo -> ctx }
+newtype LangInit (clo :: Type) (ctx :: Type) = MkLangInit { unLangInit
+  :: clo -> ctx }
 
-newtype LangParser (cmd :: Type) =
-  MkLangParser { unLangParser :: forall sig m. Has (Throw SyntaxError) sig m => Text -> m cmd }
+newtype LangParser (cmd :: Type) = MkLangParser { unLangParser
+  :: forall (sig :: SigKind) (m :: CarrierKind)
+  .  Has (Throw SyntaxError) sig m
+  => Text -> m cmd }
 
-newtype LangExec (cmd :: Type) (sem :: Type) (ctx :: Type) =
-  MkLangExec { unLangExec :: forall sig m. ( Has (Throw LangError) sig m, Has (State ctx) sig m, Has Runtime sig m ) => cmd -> m sem }
+newtype LangExec (cmd :: Type) (sem :: Type) (ctx :: Type) = MkLangExec { unLangExec
+  :: forall (sig :: SigKind) (m :: CarrierKind)
+  .  ( Has (Throw LangError) sig m
+     , Has (State ctx) sig m
+     , Has Runtime sig m )
+  => cmd -> m sem }
 
-newtype LangPP (sem :: Type) (ctx :: Type) =
-  MkLangPP { unLangPP :: forall sig m. Has (Reader ctx) sig m => sem -> m Text }
+newtype LangPP (sem :: Type) (ctx :: Type) = MkLangPP { unLangPP
+  :: forall (sig :: SigKind) (m :: CarrierKind)
+  .  Has (Reader ctx) sig m
+  => sem -> m Text }
 
-type MetaRTS clo cmd sem ctx sig m =
+type MetaRTS (clo :: Type) (cmd :: Type) (sem :: Type) (ctx :: Type) (sig :: SigKind) (m :: CarrierKind) =
   ( Has (Reader LangName) sig m
   , Has (Reader (LangOpts clo)) sig m
   , Has (Reader (LangInit clo ctx)) sig m
