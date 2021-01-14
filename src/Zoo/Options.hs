@@ -1,5 +1,5 @@
 -- | Command line options parsing
-module Zoo.Parser where
+module Zoo.Options where
 
 import           Control.Algebra
 import           Control.Carrier.Reader
