@@ -2,6 +2,7 @@ module Command where
 
 import Control.Carrier.Reader
 import Control.Carrier.State.Strict
+import Control.Effect.Runtime
 import Control.Effect.Throw
 import Control.Lens
 import Data.Text (Text)

@@ -7,6 +7,7 @@ module Machine where
 
 import           Control.Carrier.State.Strict
 import           Control.Carrier.Throw.Either
+import           Control.Effect.Runtime
 import           Control.Exception (Exception)
 import           Control.Lens
 import           Control.Monad (when)

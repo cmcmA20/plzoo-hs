@@ -2,6 +2,7 @@ module Main where
 
 import           Control.Carrier.Lift
 import           Control.Carrier.Reader
+import           Control.Carrier.Runtime.IO
 import           Control.Carrier.State.Strict
 import           Control.Carrier.Throw.Either
 import           Control.Lens
