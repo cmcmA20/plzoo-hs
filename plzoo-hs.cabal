@@ -16,7 +16,11 @@ extra-source-files:  CHANGELOG.md, README.md
 
 library
   exposed-modules:      Zoo
-  other-modules:
+  other-modules:        Zoo.Core
+                      , Zoo.Error
+                      , Zoo.Location
+                      , Zoo.Main
+                      , Zoo.Parser
   build-depends:        base >= 4.14 && <4.15
                       , fused-effects >= 1.1.0.0
                       , fused-effects-exceptions
