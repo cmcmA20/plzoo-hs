@@ -75,8 +75,8 @@ pEOF = MkParser do
     [] -> pure ()
     _  -> throwError $ SEParse LNowhere -- FIXME location
 
--- pSingle :: forall i u. Eq i => i -> Parser i u i
--- pSingle = pSatisfy . (==)
+pSingle :: forall i u. Eq i => i -> Parser i u i
+pSingle = pSatisfy . (==)
 
 pAny :: forall i u. Parser i u i
 pAny = MkParser do
@@ -84,3 +84,6 @@ pAny = MkParser do
   case ps ^. #inputStream of
     []     -> throwError $ SEParse LNowhere -- FIXME location
     c:inp' -> modify @(ParserState i u) (& #inputStream .~ inp') >> pure c
+
+pFail :: Parser i u a
+pFail = MkParser $ throwError $ SEParse LNowhere -- FIXME location

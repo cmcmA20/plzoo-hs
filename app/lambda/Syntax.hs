@@ -33,6 +33,9 @@ weakenFin :: forall (n :: Nat). Fin n -> Fin ('S n)
 weakenFin FZ     = FZ
 weakenFin (FS k) = FS (weakenFin k)
 
+toFin :: Integer -> Fin ('S n)
+toFin = undefined
+
 data Term' :: Nat -> Type where
   TFree  :: forall (n :: Nat). Text -> Term' n
   TBound :: forall (n :: Nat). Fin n -> Term' n
