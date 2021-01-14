@@ -3,11 +3,11 @@ module Zoo
   , module Zoo.Error
   , module Zoo.Location
   , module Zoo.Main
-  , module Zoo.Parser
+  , module Zoo.Options
   ) where
 
 import Zoo.Core
 import Zoo.Error
 import Zoo.Location
 import Zoo.Main
-import Zoo.Parser
+import Zoo.Options
