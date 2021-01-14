@@ -18,12 +18,18 @@ newtype Ctx = MkCtx { unCtx :: HashMap Text Decl }
 empty :: Ctx
 empty = MkCtx HM.empty
 
+lookupSafe
+  :: ( Has (Reader Ctx) sig m )
+  => Text
+  -> m (Maybe Decl)
+lookupSafe name = asks @Ctx (HM.lookup name . unCtx)
+
 lookup
   :: ( Has (Reader Ctx) sig m
      , Has (Throw LangError) sig m )
   => Text
   -> m Decl
-lookup name = asks @Ctx (HM.lookup name . unCtx) >>=
+lookup name = lookupSafe name >>=
   maybeThrow (LERuntime $ locate Nothing $ "unknown identifier " <> name)
 
 define :: Has (State Ctx) sig m => Text -> Decl -> m ()

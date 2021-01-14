@@ -54,7 +54,7 @@ evalCmd (CDepth d) = do
   pure $ Left "I will evaluate FIXME_DEPTH"
 evalCmd (CConst name) = do
   env <- get @ExCtx
-  mv <- runReader (env ^. #ctx) (Con.lookup name)
+  mv <- runReader (env ^. #ctx) (Con.lookupSafe name)
   case mv of
     Nothing -> do
       env' <- execState (env ^. #ctx) $ Con.define name Nothing
@@ -63,7 +63,7 @@ evalCmd (CConst name) = do
     Just _  -> throwError (LERuntime $ locate Nothing $ name <> " already exists")
 evalCmd (CDefine name value) = do
   env <- get @ExCtx
-  mv <- runReader (env ^. #ctx) (Con.lookup name)
+  mv <- runReader (env ^. #ctx) (Con.lookupSafe name)
   case mv of
     Nothing -> do
       env' <- execState (env ^. #ctx) $ Con.define name (Just value)

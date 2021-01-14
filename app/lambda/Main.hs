@@ -27,10 +27,16 @@ ini = MkLangInit $ const $ Cmd.MkExCtx
   { Cmd.energy = N.ELazy, Cmd.depth = N.DShallow, Cmd.ctx = Con.empty }
 
 toplevelParser :: Has (Throw SyntaxError) sig m => Text -> m Cmd.Cmd
-toplevelParser t = undefined
+toplevelParser t = do
+  case L.runAlex (T.unpack t) L.alexScanAll of
+    Left  _    -> throwError $ SELex LNowhere -- FIXME
+    Right toks -> runParser () toks P.commandLine
 
 fileParser :: Has (Throw SyntaxError) sig m => Text -> m [Cmd.Cmd]
-fileParser = undefined -- FIXME
+fileParser t = do
+  case L.runAlex (T.unpack t) L.alexScanAll of
+    Left  _    -> throwError $ SELex LNowhere -- FIXME
+    Right toks -> runParser () toks P.file
 
 exec :: LangExec Cmd.Cmd Cmd.Sem Cmd.ExCtx
 exec = MkLangExec Cmd.evalCmd
