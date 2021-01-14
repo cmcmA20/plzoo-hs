@@ -27,7 +27,7 @@ import qualified System.Posix.Signals            as S
 
 import Zoo.Core
 import Zoo.Error
-import Zoo.Parser
+import Zoo.Options
 
 runCommand
   :: forall cmd sem ctx sig m
