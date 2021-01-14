@@ -24,6 +24,7 @@ library
                       , Zoo.Location
                       , Zoo.Main
                       , Zoo.Options
+                      , Zoo.Parser
   build-depends:        base >= 4.14 && <4.15
                       , fused-effects >= 1.1.0.0
                       , fused-effects-exceptions
@@ -40,10 +41,10 @@ library
                       , DataKinds
                       , DeriveFunctor
                       , DeriveGeneric
-                      , DerivingVia
                       , FlexibleInstances
                       , GADTs
                       , GeneralizedNewtypeDeriving
+                      , InstanceSigs
                       , KindSignatures
                       , MultiParamTypeClasses
                       , OverloadedLabels
@@ -141,7 +142,6 @@ executable lambda
                      , base >=4.14 && <4.15
                      , fused-effects
                      , lens
-                     , megaparsec
                      , plzoo-hs
                      , singletons
                      , text
@@ -156,6 +156,7 @@ executable lambda
                      , GADTs
                      , OverloadedLabels
                      , OverloadedStrings
+                     , RankNTypes
                      , ScopedTypeVariables
                      , StandaloneKindSignatures
                      , TemplateHaskell

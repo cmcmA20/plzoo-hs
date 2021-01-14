@@ -1,16 +1,44 @@
 module Parser where
 
-import Control.Applicative
-import Control.Effect.Lift
 import Control.Effect.Reader
+import Control.Effect.State
+import Control.Effect.Throw
+import Data.Kind (Type)
 import Data.Text (Text)
 
-import qualified Command as C
-import qualified Lexer as L
+import qualified Command   as C
+import qualified Lexer     as L
 import qualified Normalize as N
-import qualified Syntax as S
 import           Zoo
 
+topDirective :: Parser L.Token () C.Cmd
+topDirective = do
+  t <- pAny
+  case t of
+    L.TEager    -> pure $ C.CEnergy N.EEager
+    L.TLazy     -> pure $ C.CEnergy N.ELazy
+    L.TDeep     -> pure $ C.CDepth N.DDeep
+    L.TShallow  -> pure $ C.CDepth N.DShallow
+    L.TContext  -> pure C.CContext
+    L.THelp     -> pure C.CHelp
+    L.TQuit     -> pure C.CQuit
+    L.TConstant -> C.CConst <$> name
+    _           -> undefined
+
+name :: Parser L.Token () Text
+name = do
+  t <- pAny
+  case t of
+    L.TName n -> pure n
+    _         -> undefined
+
+-- topDef :: Parser L.Token () C.Cmd
+-- topDef = do
+--   n <- name
+--   _ <- sendM @(LamParser m) $ single L.TColonEq
+--   e <- expr
+--   pure $ C.CDefine n e
+--
 -- type LamParser m = ParsecT SyntaxError [L.Token] m
 -- 
 -- type W sig m =
@@ -27,26 +55,6 @@ import           Zoo
 -- topExpr :: W sig m => m C.Cmd
 -- topExpr = C.CExpr <$> expr
 -- 
--- topDef :: forall sig m. W sig m => m C.Cmd
--- topDef = do
---   n <- name
---   _ <- sendM @(LamParser m) $ single L.TColonEq
---   e <- expr
---   pure $ C.CDefine n e
--- 
--- topDirective :: forall sig m. W sig m => m C.Cmd
--- topDirective = do
---   t <- sendM @(LamParser m) anySingle
---   case t of
---     L.TEager -> pure $ C.CEnergy N.EEager
---     L.TLazy -> pure $ C.CEnergy N.ELazy
---     L.TDeep -> pure $ C.CDepth N.DDeep
---     L.TShallow -> pure $ C.CDepth N.DShallow
---     L.TContext -> pure C.CContext
---     L.THelp -> pure C.CHelp
---     L.TQuit -> pure C.CQuit
---     L.TConstant -> C.CConst <$> name
---     _ -> undefined
 -- 
 -- name :: W sig m => m Text
 -- name = pure undefined
