@@ -21,6 +21,7 @@ data Cmd
   | CContext
   | CEnergy !Energy
   | CDepth !Depth
+  deriving Show
 
 data ExCtx = MkExCtx
   { energy :: !Energy

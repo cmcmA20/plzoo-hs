@@ -6,8 +6,10 @@ import Data.Singletons (SingI)
 import Syntax
 
 data Depth = DShallow | DDeep
+  deriving Show
 
 data Energy = ELazy | EEager
+  deriving Show
 
 laConst :: Term' 'Z
 laConst = TLam (TLam (TBound (FS FZ)))
