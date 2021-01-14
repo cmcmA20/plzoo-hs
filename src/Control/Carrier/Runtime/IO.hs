@@ -1,0 +1,22 @@
+module Control.Carrier.Runtime.IO
+  ( module Control.Effect.Runtime
+  , RuntimeIOC(..)
+  ) where
+
+import           Control.Algebra
+import           Control.Effect.Runtime
+import           Control.Monad.IO.Class (liftIO, MonadIO)
+import           Data.Kind (Type)
+import qualified Data.Text.IO                    as TIO
+import qualified System.Exit                     as S
+
+type CarrierKind = Type -> Type
+
+newtype RuntimeIOC (m :: CarrierKind) (a :: Type) = MkRuntimeIOC { runRuntimeIOC :: m a }
+  deriving (Applicative, Functor, Monad, MonadIO)
+
+instance (MonadIO m, Algebra sig m) => Algebra (Runtime :+: sig) (RuntimeIOC m) where
+  alg _   (L RExit)      c = c <$ liftIO S.exitSuccess
+  alg _   (L RRead)      c = (<$ c) <$> liftIO TIO.getLine
+  alg _   (L (RWrite t)) c = c <$ liftIO (TIO.putStr t)
+  alg hdl (R other)      c = MkRuntimeIOC $ alg (runRuntimeIOC . hdl) other c
