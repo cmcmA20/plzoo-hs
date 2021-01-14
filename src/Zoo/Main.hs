@@ -10,6 +10,7 @@ import           Control.Carrier.State.Strict
 import qualified Control.Concurrent              as S
 import           Control.Effect.Exception
 import           Control.Effect.Lift
+import           Control.Effect.Runtime
 import           Control.Lens
 import           Control.Monad (forever, forM_, unless, void, when)
 import           Data.Generics.Labels ()

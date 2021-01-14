@@ -2,6 +2,7 @@ module Main where
 
 import           Control.Carrier.Lift
 import           Control.Carrier.Reader
+import           Control.Carrier.Runtime.Pure
 import           Control.Effect.Throw
 import qualified Data.HashMap.Strict          as HM
 import           Data.Text (Text)

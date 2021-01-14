@@ -2,6 +2,7 @@ module Main where
 
 import           Control.Carrier.Lift
 import           Control.Carrier.Reader
+import           Control.Carrier.Runtime.IO
 import           Control.Effect.Throw
 import           Data.Text (Text)
 import qualified Data.Text as T

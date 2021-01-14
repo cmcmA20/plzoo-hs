@@ -15,7 +15,10 @@ build-type:          Simple
 extra-source-files:  CHANGELOG.md, README.md
 
 library
-  exposed-modules:      Zoo
+  exposed-modules:      Control.Effect.Runtime
+                      , Control.Carrier.Runtime.IO
+                      , Control.Carrier.Runtime.Pure
+                      , Zoo
   other-modules:        Zoo.Core
                       , Zoo.Error
                       , Zoo.Location
@@ -37,6 +40,7 @@ library
                       , DataKinds
                       , DeriveFunctor
                       , DeriveGeneric
+                      , DerivingVia
                       , FlexibleInstances
                       , GADTs
                       , GeneralizedNewtypeDeriving
