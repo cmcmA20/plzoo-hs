@@ -6,7 +6,6 @@ import           Control.Carrier.Runtime.IO
 import           Control.Effect.Throw
 import           Data.Text (Text)
 import qualified Data.Text as T
-import           Text.Megaparsec
 
 import qualified Command as Cmd
 import qualified Context as Con

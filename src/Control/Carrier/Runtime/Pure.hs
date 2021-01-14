@@ -13,7 +13,7 @@ type CarrierKind = Type -> Type
 
 -- | drops any I/O
 newtype RuntimePureC (m :: CarrierKind) (a :: Type) = MkRuntimePureC { runRuntimePureC :: m a }
-  deriving (Functor, Applicative, Monad)
+  deriving (Applicative, Functor, Monad)
 
 instance Algebra sig m => Algebra (Runtime :+: sig) (RuntimePureC m) where
   alg hdl si ct = MkRuntimePureC case si of
