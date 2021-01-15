@@ -1,20 +1,23 @@
 module Parser where
 
 import Control.Applicative ((<|>), many)
--- import Control.Effect.State
--- import Control.Lens hiding (simple)
-import Control.Monad (join)
+import Control.Effect.State
+import Control.Lens ((&), (%~))
 import Data.Functor (($>))
-import Data.List (foldl1')
+import Data.List (foldl')
+import Data.Singletons
 import Data.Text (Text)
+import Prelude hiding (pred)
 
 import qualified Command   as C
+import           Data.Fin
+import           Data.Nat
 import qualified Lexer     as L
 import qualified Normalize as N
 import qualified Syntax    as S
 import           Zoo
 
-file :: Parser L.Token () [C.Cmd]
+file :: Parser L.Token Nat [C.Cmd]
 file =   pSingle L.TEOF $> []
      <|> pure <$> topDirective <* pSingle L.TEOF
      <|> (:) <$> topDirective <*> (file <* pSingle L.TSemi) <* pSingle L.TEOF
@@ -23,12 +26,12 @@ file =   pSingle L.TEOF $> []
      <|> pure <$> topExpr <* pSingle L.TEOF
      <|> (:) <$> topExpr <*> (file <* pSingle L.TSemi) <* pSingle L.TEOF
 
-commandLine :: Parser L.Token () C.Cmd
+commandLine :: Parser L.Token Nat C.Cmd
 commandLine =   topDirective <* pSingle L.TEOF
             <|> topDef       <* pSingle L.TEOF
             <|> topExpr      <* pSingle L.TEOF
 
-topDirective :: Parser L.Token () C.Cmd
+topDirective :: Parser L.Token Nat C.Cmd
 topDirective = do
   t <- pAny
   case t of
@@ -42,47 +45,71 @@ topDirective = do
     L.TConstant -> C.CConst <$> name
     _           -> pFail
 
-name :: Parser L.Token () Text
+name :: Parser L.Token u Text
 name = do
   t <- pAny
   case t of
     L.TName n -> pure n
     _         -> pFail
 
-topDef :: Parser L.Token () C.Cmd
+index :: Parser L.Token u Nat
+index = do
+  t <- pAny
+  case t of
+    L.TIndex i -> pure $ integerToNat i
+    _          -> pFail
+
+topDef :: Parser L.Token Nat C.Cmd
 topDef = do
   n <- name
   _ <- pSingle L.TColonEq
   e <- expr
-  pure $ C.CDefine n (S.MkTerm e)
+  case e of
+    S.MkSomeTerm SZ t -> pure $ C.CDefine n $ S.MkTerm t
+    S.MkSomeTerm _  _ -> pFail
 
-topExpr :: Parser L.Token () C.Cmd
-topExpr = C.CExpr . S.MkTerm <$> expr
+topExpr :: Parser L.Token Nat C.Cmd
+topExpr = do
+  e <- expr
+  case e of
+    S.MkSomeTerm SZ t -> pure $ C.CExpr $ S.MkTerm t
+    S.MkSomeTerm _  _ -> pFail
 
-expr :: Parser L.Token () (S.Term' n)
-expr =   pSingle L.TLambda *> (S.TLam <$> expr)
-     <|> foldl1' S.TApp . join <$> many app -- FIXME awfulness ensues
+lamDown :: forall i. Parser i Nat ()
+lamDown = MkParser $ modify @(ParserState i Nat) (& #userState %~ suc)
 
--- lamExpandCtx :: Parser L.Token () (S.Term' ('S.S n)) -> Parser L.Token Integer (S.Term' n)
--- lamExpandCtx p = MkParser $ modify @(ParserState L.Token ()) (& #userState +~ 1)
+lamUp :: forall i. Parser i Nat ()
+lamUp = MkParser $ modify @(ParserState i Nat) (& #userState %~ pred)
 
-app :: Parser L.Token () [S.Term' n]
-app =   pure <$> simple
-    <|> (:) <$> simple <*> app
+expr :: Parser L.Token Nat S.SomeTerm
+expr =  pSingle L.TLambda *> lamDown *> (S.mkLam <$> expr) <* lamUp
+    <|> app
 
-simple :: Parser L.Token () (S.Term' n)
-simple =   pSingle L.TLParen *> expr <* pSingle L.TRParen
-       <|> var
+app :: Parser L.Token Nat S.SomeTerm
+app = do
+  ts <- many simple
+  case ts of
+    []    -> pFail
+    t:ts' -> pure $ foldl' S.mkApp t ts'
 
-var :: Parser L.Token () (S.Term' n)
-var = free <|> bound
+simple :: Parser L.Token Nat S.SomeTerm
+simple =  pSingle L.TLParen *> expr <* pSingle L.TRParen
+      <|> free
+      <|> bound
 
-free :: Parser L.Token () (S.Term' n)
-free = S.TFree <$> name
+free :: Parser L.Token Nat S.SomeTerm
+free = do
+  v <- name
+  n <- MkParser $ gets @(ParserState L.Token Nat) userState
+  pure $ case toSing n of
+    SomeSing sn -> S.MkSomeTerm sn $ S.TFree v
 
-bound :: Parser L.Token () (S.Term' n)
+bound :: Parser L.Token Nat S.SomeTerm
 bound = do
-  t <- pAny
-  case t of
-    L.TIndex i -> undefined -- pure $ S.TBound $ S.toFin i
-    _          -> pFail
+  j <- index
+  n <- MkParser $ gets @(ParserState L.Token Nat) userState
+  case toSing n of
+    SomeSing SZ      -> pFail
+    SomeSing (SS n') -> case natToFin n' j of
+      Nothing -> pFail
+      Just k  -> pure $ S.MkSomeTerm (SS n') $ S.TBound k
