@@ -40,7 +40,8 @@ type Lambda sig m =
 evalCmd :: Lambda sig m => Cmd -> m Sem
 evalCmd (CExpr t) = do
   env <- get @ExCtx
-  r <- runReader (env ^. #energy) . runReader (env ^. #depth) $ normalize t
+  r <- runReader (env ^. #energy) .
+    runReader (env ^. #depth) . normalize $ t
   pure $ Right r
 evalCmd CContext = do
   env <- get @ExCtx

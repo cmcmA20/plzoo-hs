@@ -52,5 +52,8 @@ normalize' (TApp s t  ) = do
     TLam body -> pure $ substOut t' body
     _         -> pure $ TApp s' t'
 
-normalize :: ( Has (Reader Depth) sig m, Has (Reader Energy) sig m ) => Term -> m Term
+normalize
+  :: ( Has (Reader Depth) sig m
+     , Has (Reader Energy) sig m )
+  => Term -> m Term
 normalize (MkTerm t) = MkTerm <$> normalize' t

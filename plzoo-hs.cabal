@@ -153,6 +153,7 @@ executable lambda
                      , ConstraintKinds
                      , DataKinds
                      , DeriveGeneric
+                     , DerivingVia
                      , GADTs
                      , OverloadedLabels
                      , OverloadedStrings

@@ -30,13 +30,13 @@ toplevelParser :: Has (Throw SyntaxError) sig m => Text -> m Cmd.Cmd
 toplevelParser t = do
   case L.runAlex (T.unpack t) L.alexScanAll of
     Left  _    -> throwError $ SELex LNowhere -- FIXME
-    Right toks -> runParser () toks P.commandLine
+    Right toks -> runParser () toks (P.commandLine <* pEOF)
 
 fileParser :: Has (Throw SyntaxError) sig m => Text -> m [Cmd.Cmd]
 fileParser t = do
   case L.runAlex (T.unpack t) L.alexScanAll of
     Left  _    -> throwError $ SELex LNowhere -- FIXME
-    Right toks -> runParser () toks P.file
+    Right toks -> runParser () toks (P.file <* pEOF)
 
 exec :: LangExec Cmd.Cmd Cmd.Sem Cmd.ExCtx
 exec = MkLangExec Cmd.evalCmd
