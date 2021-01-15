@@ -41,7 +41,8 @@ evalCmd :: Lambda sig m => Cmd -> m Sem
 evalCmd (CExpr t) = do
   env <- get @ExCtx
   r <- runReader (env ^. #energy) .
-    runReader (env ^. #depth) . normalize $ t
+    runReader (env ^. #depth) .
+    runReader (env ^. #ctx) . normalize $ t
   pure $ Right r
 evalCmd CContext = do
   env <- get @ExCtx
@@ -58,7 +59,7 @@ evalCmd (CConst name) = do
   mv <- runReader (env ^. #ctx) (Con.lookupSafe name)
   case mv of
     Nothing -> do
-      env' <- execState (env ^. #ctx) $ Con.define name Nothing
+      env' <- execState (env ^. #ctx) $ Con.define name Con.DConst
       modify @ExCtx (& #ctx .~ env')
       pure $ Left $ name <> " is a constant"
     Just _  -> throwError (LERuntime $ locate Nothing $ name <> " already exists")
@@ -67,7 +68,7 @@ evalCmd (CDefine name value) = do
   mv <- runReader (env ^. #ctx) (Con.lookupSafe name)
   case mv of
     Nothing -> do
-      env' <- execState (env ^. #ctx) $ Con.define name (Just value)
+      env' <- execState (env ^. #ctx) $ Con.define name (Con.DTerm value)
       modify @ExCtx (& #ctx .~ env')
       pure $ Left $ name <> " is defined"
     Just _  -> throwError (LERuntime $ locate Nothing $ name <> " already exists")
