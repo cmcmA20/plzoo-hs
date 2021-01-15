@@ -68,7 +68,7 @@ evalCmd (CDefine name value) = do
   mv <- runReader (env ^. #ctx) (Con.lookupSafe name)
   case mv of
     Nothing -> do
-      env' <- execState (env ^. #ctx) $ Con.define name (Con.DTerm value)
+      env' <- execState (env ^. #ctx) $ Con.define name $ Con.DTerm value
       modify @ExCtx (& #ctx .~ env')
       pure $ Left $ name <> " is defined"
     Just _  -> throwError (LERuntime $ locate Nothing $ name <> " already exists")
