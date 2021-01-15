@@ -14,7 +14,7 @@ import Zoo.Location
 data ParserState (i :: Type) (u :: Type) = MkParserState
   { inputStream :: [i]
   , userState   :: u }
-  deriving Generic
+  deriving (Generic, Show)
 
 newtype Parser (i :: Type) (u :: Type) (o :: Type) = MkParser { unParser
   :: forall (sig :: SigKind) (m :: CarrierKind)
@@ -57,7 +57,11 @@ runParser
   -> [i] -- ^ input stream
   -> Parser i u o -- ^ parser
   -> m o
-runParser st inp = evalState (MkParserState inp st) . unParser
+runParser st inp =
+  liftEither . run . evalState (MkParserState inp st) . runThrow @SyntaxError . unParser
+
+pFail :: Parser i u a
+pFail = empty
 
 pSatisfy :: forall i u. (i -> Bool) -> Parser i u i
 pSatisfy predi = MkParser do
@@ -84,6 +88,3 @@ pAny = MkParser do
   case ps ^. #inputStream of
     []     -> throwError $ SEParse LNowhere -- FIXME location
     c:inp' -> modify @(ParserState i u) (& #inputStream .~ inp') >> pure c
-
-pFail :: Parser i u a
-pFail = MkParser $ throwError $ SEParse LNowhere -- FIXME location
