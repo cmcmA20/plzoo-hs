@@ -6,8 +6,6 @@ import Data.Singletons.TH (genSingletons, sing, SingI, withSingI)
 import Data.Text (Text)
 import qualified Data.Text as T
 
--- import Zoo
-
 data Nat :: Type where
   Z :: Nat
   S :: Nat -> Nat
@@ -34,7 +32,8 @@ weakenFin FZ     = FZ
 weakenFin (FS k) = FS (weakenFin k)
 
 toFin :: Integer -> Fin ('S n)
-toFin = undefined
+toFin 0 = FZ
+toFin _ = undefined -- FIXME
 
 data Term' :: Nat -> Type where
   TFree  :: forall (n :: Nat). Text -> Term' n
@@ -77,9 +76,9 @@ substOut rep (TLam body ) = TLam (substOut (weakenCtx rep) body)
 substOut rep (TApp u v  ) = TApp (substOut rep u) (substOut rep v)
 
 newtype Term = MkTerm { unTerm :: Term' 'Z }
-  deriving Show
+  deriving Show via Term' 'Z
 
--- newtype Term' = MkTerm' { unTerm' :: Located Term'' }
--- 
--- instance Eq Term' where
---   MkTerm' (MkLocated x _) == MkTerm' (MkLocated y _) = x == y
+weakest :: forall (n :: Nat). SingI n => Term' 'Z -> Term' n
+weakest t = case sing @n of
+  SZ    -> t
+  SS n' -> withSingI n' (weakenCtx (weakest t))
