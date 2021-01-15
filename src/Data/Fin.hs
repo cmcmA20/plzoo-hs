@@ -1,7 +1,7 @@
 module Data.Fin where
 
 import Data.Kind (Type)
-import Data.Singletons (sing, SingI, withSingI)
+import Data.Singletons (sing, Sing, SingI, withSingI)
 
 import Data.Nat
 
@@ -20,27 +20,29 @@ instance Show (Fin n) where
   show (FS FZ) = "FS FZ"
   show (FS k ) = "FS (" <> show k <> ")"
 
-weakenFin :: forall (n :: Nat). Fin n -> Fin ('S n)
-weakenFin FZ     = FZ
-weakenFin (FS k) = FS (weakenFin k)
+weakenBound :: forall (n :: Nat). Fin n -> Fin ('S n)
+weakenBound FZ     = FZ
+weakenBound (FS k) = FS (weakenBound k)
 
-strengthenFin :: forall (n :: Nat). SingI n => Fin ('S n) -> Maybe (Fin n)
-strengthenFin k = case sing @n of
+strengthenBoundI :: forall (n :: Nat). SingI n => Fin ('S n) -> Maybe (Fin n)
+strengthenBoundI k = case sing @n of
   SZ    -> Nothing
   SS n' -> case k of
     FZ    -> Just FZ
-    FS k' -> case withSingI n' strengthenFin k' of
+    FS k' -> case withSingI n' strengthenBoundI k' of
       Nothing -> Nothing
       Just x  -> Just (FS x)
 
-finToNat :: forall (n :: Nat). SingI n => Fin ('S n) -> Nat
-finToNat k = case sing @n of
+finToNatI :: forall (n :: Nat). SingI n => Fin ('S n) -> Nat
+finToNatI k = case sing @n of
   SZ    -> Z
   SS n' -> case k of
     FZ    -> Z
-    FS k' -> S (withSingI n' finToNat k')
+    FS k' -> S (withSingI n' finToNatI k')
 
-natToFin :: forall (n :: Nat). SingI n => Fin ('S n)
-natToFin = case sing @n of
-  SZ    -> FZ
-  SS n' -> FS (withSingI n' natToFin)
+natToFin :: forall (n :: Nat). Sing n -> Nat -> Maybe (Fin ('S n))
+natToFin _        Z     = Just FZ
+natToFin SZ       (S _) = Nothing
+natToFin (SS sn') (S j) = case natToFin sn' j of
+  Nothing -> Nothing
+  Just k  -> Just (FS k)
