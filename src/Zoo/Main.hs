@@ -26,6 +26,7 @@ import qualified System.IO                       as S
 import qualified System.Posix.Signals            as S
 
 import Zoo.Core
+import Zoo.Debug
 import Zoo.Error
 import Zoo.Options
 
@@ -85,8 +86,11 @@ printResult v = do
 toplevel
   :: forall clo cmd sem ctx sig m
   .  ( MetaRTS clo cmd sem ctx sig m
+     , Has (Reader Debug) sig m
      , Has (State ctx) sig m
-     , Show sem )
+     , Show cmd
+     , Show sem
+     , Show ctx )
   => m ()
 toplevel = do
   languageName <- asks @LangName unLangName
@@ -100,7 +104,8 @@ toplevel = do
           c <- readToplevel @clo @cmd @sem @ctx
           r <- runCommand @cmd @sem @ctx c
           curCtx <- get @ctx
-          runReader curCtx $ printResult @sem @ctx r
+          runReader curCtx do
+            printResult @sem @ctx r
   where
     eofMarker :: Text
     eofMarker = case S.os of
@@ -137,19 +142,26 @@ readFile filename = do
 useFile
   :: forall clo cmd sem ctx sig m
   .  ( MetaRTS clo cmd sem ctx sig m
-     , Has (State ctx) sig m )
+     , Has (State ctx) sig m
+     , Show sem )
   => Text
   -> m ()
 useFile filename =
   defaultErrorHandler @SyntaxError do
     cs  <- readFile @cmd filename
     defaultErrorHandler @LangError $
-      forM_ cs $ runCommand @cmd @sem @ctx
+      forM_ cs \c -> do
+        r <- runCommand @cmd @sem @ctx c
+        curCtx <- get @ctx
+        runReader curCtx do
+          printResult @sem @ctx r
 
 zooMain
   :: forall clo cmd sem ctx sig m
   .  ( MetaRTS clo cmd sem ctx sig m
-     , Show sem )
+     , Show cmd
+     , Show sem
+     , Show ctx )
   => m ()
 zooMain = do
   sendIO do
@@ -164,7 +176,11 @@ zooMain = do
       TIO.putStrLn $ ln <> " (" <> T.pack S.os <> ")"
       S.exitSuccess
 
+  when (defOpts ^. #nonInteractive . to not) do
+    pure () -- TODO revert default line wrapper handler
+
   initState <- asks @(LangInit clo ctx) unLangInit
-  st <- execState (initState opts) $ forM_ (defOpts ^. #filesToLoad) $ useFile @clo @cmd @sem @ctx
-  unless (defOpts ^. #nonInteractive) $
-    evalState st $ toplevel @clo @cmd @sem @ctx
+  runReader (defOpts ^. #metaDebug) $ evalState (initState opts) do
+    forM_ (defOpts ^. #filesToLoad) $ useFile @clo @cmd @sem @ctx
+    unless (defOpts ^. #nonInteractive) $
+     toplevel @clo @cmd @sem @ctx
