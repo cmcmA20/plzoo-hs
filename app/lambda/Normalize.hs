@@ -1,11 +1,12 @@
 module Normalize where
 
 import Control.Effect.Reader
+import Control.Effect.Throw
 import Data.Singletons (SingI)
 
-import Data.Fin
-import Data.Nat
+import Context
 import Syntax
+import Zoo
 
 data Depth = DShallow | DDeep
   deriving Show
@@ -13,31 +14,21 @@ data Depth = DShallow | DDeep
 data Energy = ELazy | EEager
   deriving Show
 
-laConst :: Term' 'Z
-laConst = TLam (TLam (TBound (FS FZ)))
-
-laWhat :: Term' 'Z
-laWhat = TFree "what"
-
-laOmega :: Term' 'Z
-laOmega = TLam $ TApp laHmm laHmm
-  where
-  laHmm :: Term' ('S 'Z)
-  laHmm = TLam $ TApp (TBound (FS FZ)) $ TApp (TBound FZ) (TBound FZ)
-
-laWtf :: Term' 'Z
-laWtf = TLam $ TApp (TApp (TBound FZ) (TBound FZ)) (TBound FZ)
-
-laDerp :: Term' 'Z
-laDerp = TApp (TLam (TFree "derp")) laWtf
-
 normalize'
   :: forall n sig m
   . ( SingI n
     , Has (Reader Depth) sig m
-    , Has (Reader Energy) sig m )
+    , Has (Reader Energy) sig m
+    , Has (Reader Ctx) sig m
+    , Has (Throw LangError) sig m )
   => Term' n -> m (Term' n)
-normalize' (TFree name) = pure $ TFree name
+normalize' (TFree name) = do
+  md <- lookupSafe name
+  case md of
+    Nothing                 ->
+      throwError $ LERuntime $ locate Nothing "unknown identifier"
+    Just DConst             -> pure $ TFree name
+    Just (DTerm (MkTerm t)) -> weakest <$> normalize' t
 normalize' (TBound k  ) = pure $ TBound k
 normalize' (TLam body ) = do
   d <- ask @Depth
@@ -56,6 +47,8 @@ normalize' (TApp s t  ) = do
 
 normalize
   :: ( Has (Reader Depth) sig m
-     , Has (Reader Energy) sig m )
+     , Has (Reader Energy) sig m
+     , Has (Reader Ctx) sig m
+     , Has (Throw LangError) sig m )
   => Term -> m Term
 normalize (MkTerm t) = MkTerm <$> normalize' t

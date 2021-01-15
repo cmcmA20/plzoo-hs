@@ -11,7 +11,7 @@ import qualified Data.Text as T
 import Syntax
 import Zoo
 
-type Decl = Maybe Term
+data Decl = DConst | DTerm Term
 
 newtype Ctx = MkCtx { unCtx :: HashMap Text Decl }
 
@@ -41,5 +41,5 @@ showAll = do
   pure $ HM.foldlWithKey' (\t k v -> t <> showOneEntry k v <> "\n") "" c
   where
   showOneEntry :: Text -> Decl -> Text
-  showOneEntry name Nothing  = "#constant " <> name <> ";"
-  showOneEntry name (Just t) = name <> " := " <> T.pack (show t) <> ";"
+  showOneEntry name DConst    = "#constant " <> name <> ";"
+  showOneEntry name (DTerm t) = name <> " := " <> T.pack (show t) <> ";"
