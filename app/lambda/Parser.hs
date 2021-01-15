@@ -19,12 +19,12 @@ import           Zoo
 
 file :: Parser L.Token Nat [C.Cmd]
 file =   pSingle L.TEOF $> []
-     <|> pure <$> topDirective <* pSingle L.TEOF
-     <|> (:) <$> topDirective <*> (file <* pSingle L.TSemi) <* pSingle L.TEOF
+     <|> (:) <$> topDirective <*> file
+     <|> (:) <$> topDirective <*> (pSingle L.TSemi *> file)
      <|> pure <$> topDef <* pSingle L.TEOF
-     <|> (:) <$> topDef <*> (file <* pSingle L.TSemi) <* pSingle L.TEOF
+     <|> (:) <$> topDef <*> (pSingle L.TSemi *> file)
      <|> pure <$> topExpr <* pSingle L.TEOF
-     <|> (:) <$> topExpr <*> (file <* pSingle L.TSemi) <* pSingle L.TEOF
+     <|> (:) <$> topExpr <*> (pSingle L.TSemi *> file)
 
 commandLine :: Parser L.Token Nat C.Cmd
 commandLine =   topDirective <* pSingle L.TEOF

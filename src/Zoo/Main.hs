@@ -165,6 +165,6 @@ zooMain = do
       S.exitSuccess
 
   initState <- asks @(LangInit clo ctx) unLangInit
-  evalState (initState opts) $ forM_ (defOpts ^. #filesToLoad) $ useFile @clo @cmd @sem @ctx
+  st <- execState (initState opts) $ forM_ (defOpts ^. #filesToLoad) $ useFile @clo @cmd @sem @ctx
   unless (defOpts ^. #nonInteractive) $
-    evalState (initState opts) $ toplevel @clo @cmd @sem @ctx
+    evalState st $ toplevel @clo @cmd @sem @ctx
