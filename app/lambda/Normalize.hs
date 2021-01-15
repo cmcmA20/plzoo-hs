@@ -3,6 +3,8 @@ module Normalize where
 import Control.Effect.Reader
 import Data.Singletons (SingI)
 
+import Data.Fin
+import Data.Nat
 import Syntax
 
 data Depth = DShallow | DDeep

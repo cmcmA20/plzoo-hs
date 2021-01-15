@@ -18,6 +18,8 @@ library
   exposed-modules:      Control.Effect.Runtime
                       , Control.Carrier.Runtime.IO
                       , Control.Carrier.Runtime.Pure
+                      , Data.Fin
+                      , Data.Nat
                       , Zoo
   other-modules:        Zoo.Core
                       , Zoo.Error
@@ -31,6 +33,7 @@ library
                       , generic-lens
                       , lens
                       , optparse-applicative
+                      , singletons
                       , text
                       , unix
   hs-source-dirs:       src
@@ -52,7 +55,9 @@ library
                       , RankNTypes
                       , ScopedTypeVariables
                       , StandaloneKindSignatures
+                      , TemplateHaskell
                       , TypeApplications
+                      , TypeFamilies
                       , TypeOperators
                       , UndecidableInstances
                       , ViewPatterns
@@ -155,12 +160,11 @@ executable lambda
                      , DeriveGeneric
                      , DerivingVia
                      , GADTs
+                     , KindSignatures
                      , OverloadedLabels
                      , OverloadedStrings
                      , RankNTypes
                      , ScopedTypeVariables
                      , StandaloneKindSignatures
-                     , TemplateHaskell
                      , TypeApplications
-                     , TypeFamilies
   ghc-options:         -Wall
