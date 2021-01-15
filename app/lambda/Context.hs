@@ -12,8 +12,10 @@ import Syntax
 import Zoo
 
 data Decl = DConst | DTerm Term
+  deriving Show
 
 newtype Ctx = MkCtx { unCtx :: HashMap Text Decl }
+  deriving Show
 
 empty :: Ctx
 empty = MkCtx HM.empty

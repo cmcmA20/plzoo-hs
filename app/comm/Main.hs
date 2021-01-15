@@ -24,13 +24,13 @@ data Clo = MkClo
   { ram      :: !Word16
   , showCode :: !Bool }
 --   , showMem  :: !Bool } NYI
-  deriving Generic
+  deriving (Generic, Show)
 
 -- wonky
 data Ctx = MkCtx
   { clo          :: !Clo
   , lastCompiled :: !(Maybe M.Program) }
-  deriving Generic
+  deriving (Generic, Show)
 
 type Sem = ()
 

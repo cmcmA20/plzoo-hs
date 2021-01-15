@@ -22,6 +22,7 @@ library
                       , Data.Nat
                       , Zoo
   other-modules:        Zoo.Core
+                      , Zoo.Debug
                       , Zoo.Error
                       , Zoo.Location
                       , Zoo.Main
@@ -33,6 +34,7 @@ library
                       , generic-lens
                       , lens
                       , optparse-applicative
+                      , pretty-simple
                       , singletons
                       , text
                       , unix

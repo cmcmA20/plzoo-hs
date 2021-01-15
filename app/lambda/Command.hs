@@ -28,7 +28,7 @@ data ExCtx = MkExCtx
   { energy :: !Energy
   , depth  :: !Depth
   , ctx    :: !Con.Ctx }
-  deriving Generic
+  deriving (Generic, Show)
 
 type Sem = Either Text Term
 
