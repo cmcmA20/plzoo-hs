@@ -29,7 +29,7 @@ instance Show (Term' n) where
   show (TLam body )         = "λ" <> show body
   show (TApp (TLam body) v) = "(λ" <> show body <> ") " <> show v
   show (TApp u (TApp v w) ) = show u <> " (" <> show (TApp v w) <> ")"
-  show (TApp u v          ) = show u <> " " <> show v
+  show (TApp u v          ) = "(" <> show u <> ") " <> show v
 
 weakenCtx :: forall (n :: Nat). Term' n -> Term' ('S n)
 weakenCtx (TFree name) = TFree name
