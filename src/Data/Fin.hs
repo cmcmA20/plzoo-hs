@@ -15,6 +15,7 @@ instance Eq (Fin n) where
   FS k == FS k' = k == k'
   _    == _     = False
 
+-- FIXME parens
 instance Show (Fin n) where
   show FZ      = "FZ"
   show (FS FZ) = "FS FZ"
