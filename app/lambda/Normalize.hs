@@ -42,7 +42,7 @@ normalize' (TApp s t  ) = do
     EEager -> normalize' t
   s' <- normalize' s
   case s' of
-    TLam body -> pure $ substOut t' body
+    TLam body -> normalize' $ substOut t' body
     _         -> pure $ TApp s' t'
 
 normalize
