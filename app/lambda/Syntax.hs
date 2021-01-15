@@ -5,7 +5,6 @@ import Data.Kind (Type)
 import Data.Singletons.Decide
 import Data.Singletons (sing, Sing, SingI, withSingI)
 import Data.Text (Text)
-import qualified Data.Text as T
 
 import Data.Fin
 import Data.Nat
@@ -16,20 +15,7 @@ data Term' n where
   TBound :: Fin n -> Term' n
   TLam   :: Term' ('S n) -> Term' n
   TApp   :: Term' n -> Term' n -> Term' n
-  deriving Eq
-
--- FIXME not optimal and may be plain wrong
-instance Show (Term' n) where
-  show (TFree name) = T.unpack name
-  show (TBound k  ) = showFin' 0 k
-    where
-    showFin' :: Integer -> Fin m -> String
-    showFin' n FZ     = "_" <> show n
-    showFin' n (FS j) = showFin' (1 + n) j
-  show (TLam body )         = "λ" <> show body
-  show (TApp (TLam body) v) = "(λ" <> show body <> ") " <> show v
-  show (TApp u (TApp v w) ) = show u <> " (" <> show (TApp v w) <> ")"
-  show (TApp u v          ) = "(" <> show u <> ") " <> show v
+  deriving (Eq, Show)
 
 weakenCtx :: forall (n :: Nat). Term' n -> Term' ('S n)
 weakenCtx (TFree name) = TFree name
