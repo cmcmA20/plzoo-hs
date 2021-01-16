@@ -82,7 +82,7 @@ lamUp :: forall i. Parser i Nat ()
 lamUp = MkParser $ modify @(ParserState i Nat) (& #userState %~ pred)
 
 expr :: Parser L.Token Nat S.SomeTerm
-expr =  pSingle L.TLambda *> lamDown *> (S.mkLam <$> expr) <* lamUp
+expr =  pSingle L.TLambda *> lamDown *> (S.unsafeMkLam <$> expr) <* lamUp
     <|> app
 
 app :: Parser L.Token Nat S.SomeTerm
@@ -90,7 +90,7 @@ app = do
   ts <- many simple
   case ts of
     []    -> pFail
-    t:ts' -> pure $ foldl' S.mkApp t ts'
+    t:ts' -> pure $ foldl' S.unsafeMkApp t ts'
 
 simple :: Parser L.Token Nat S.SomeTerm
 simple =  pSingle L.TLParen *> expr <* pSingle L.TRParen

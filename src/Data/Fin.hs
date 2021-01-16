@@ -21,10 +21,12 @@ instance Show (Fin n) where
   show (FS FZ) = "FS FZ"
   show (FS k ) = "FS (" <> show k <> ")"
 
+-- | index stays the same, bound is loosened
 weakenBound :: forall (n :: Nat). Fin n -> Fin ('S n)
 weakenBound FZ     = FZ
 weakenBound (FS k) = FS (weakenBound k)
 
+-- | index stays the same (if possible), bound is tightened
 strengthenBoundI :: forall (n :: Nat). SingI n => Fin ('S n) -> Maybe (Fin n)
 strengthenBoundI k = case sing @n of
   SZ    -> Nothing
