@@ -50,10 +50,14 @@ evalCmd CContext = do
   pure $ Left r
 evalCmd (CEnergy e) = do
   modify @ExCtx (& #energy .~ e)
-  pure $ Left "I will evaluate FIXME_ENERGY"
+  pure $ Left $ "I will evaluate " <> case e of
+    EEager -> "eagerly"
+    ELazy  -> "lazily"
 evalCmd (CDepth d) = do
   modify @ExCtx (& #depth .~ d)
-  pure $ Left "I will evaluate FIXME_DEPTH"
+  pure $ Left $ "I will evaluate " <> case d of
+    DDeep    -> "deeply"
+    DShallow -> "shallowly"
 evalCmd (CConst name) = do
   env <- get @ExCtx
   mv <- runReader (env ^. #ctx) (Con.lookupSafe name)
@@ -72,7 +76,23 @@ evalCmd (CDefine name value) = do
       modify @ExCtx (& #ctx .~ env')
       pure $ Left $ name <> " is defined"
     Just _  -> throwError (LERuntime $ locate Nothing $ name <> " already exists")
-evalCmd CHelp = pure $ Left "god help you"
+evalCmd CHelp = pure $ Left helpMessage
 evalCmd CQuit = do
   rExit
   pure $ Left "bye"
+
+helpMessage :: Text
+helpMessage = "Toplevel directives:\n\
+  \<expr>                       evaluate <expr>\n\
+  \:lazy                        evaluate lazily (do not evaluate arguments)\n\
+  \:eager                       evaluate eagrly (evaluate arguments immediately)\n\
+  \:deep                        evaluate inside λ-abstraction\n\
+  \:shallow                     do not evaluate inside λ-abstraction\n\
+  \:constant x                  declare constant x\n\
+  \:context                     print current definitions\n\
+  \:help                        print this help\n\
+  \:quit                        exit\n\
+  \ \n\
+  \Syntax:\n\
+  \λ e                          λ-abstraction\n\
+  \e1 e2                        application"

@@ -6,8 +6,8 @@ import           Control.Effect.Throw
 import           Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HM
 import           Data.Text (Text)
-import qualified Data.Text as T
 
+import Printer
 import Syntax
 import Zoo
 
@@ -43,5 +43,5 @@ showAll = do
   pure $ HM.foldlWithKey' (\t k v -> t <> showOneEntry k v <> "\n") "" c
   where
   showOneEntry :: Text -> Decl -> Text
-  showOneEntry name DConst    = "#constant " <> name <> ";"
-  showOneEntry name (DTerm t) = name <> " := " <> T.pack (show t) <> ";"
+  showOneEntry name DConst    = "#constant " <> name <> " ;"
+  showOneEntry name (DTerm t) = name <> " := " <> showTerm t <> " ;"
