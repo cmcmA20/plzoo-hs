@@ -13,6 +13,7 @@ import           Data.Nat
 import qualified Lexer as L
 import qualified Normalize as N
 import qualified Parser as P
+import qualified Printer as P
 import           Zoo
 
 type Clo = ()
@@ -47,7 +48,7 @@ pp = MkLangPP ppHelper
   where
   ppHelper :: Has (Reader Cmd.ExCtx) sig m => Cmd.Sem -> m Text
   ppHelper (Left  text) = pure text
-  ppHelper (Right term) = pure $ T.pack $ show term
+  ppHelper (Right term) = pure $ P.showTerm term
 
 main :: IO ()
 main

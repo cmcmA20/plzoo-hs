@@ -43,3 +43,7 @@ integerToNat i
   where
   integerToNat' 0 = Z
   integerToNat' j = S (integerToNat' (j - 1))
+
+natToInteger :: Nat -> Integer
+natToInteger Z     = 0
+natToInteger (S n) = 1 + natToInteger n

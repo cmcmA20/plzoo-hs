@@ -28,7 +28,7 @@ normalize' (TFree name) = do
     Nothing                 ->
       throwError $ LERuntime $ locate Nothing "unknown identifier"
     Just DConst             -> pure $ TFree name
-    Just (DTerm (MkTerm t)) -> weakest <$> normalize' t
+    Just (DTerm (MkTerm t)) -> weakestTermBoundI <$> normalize' t
 normalize' (TBound k  ) = pure $ TBound k
 normalize' (TLam body ) = do
   d <- ask @Depth
@@ -42,7 +42,7 @@ normalize' (TApp s t  ) = do
     EEager -> normalize' t
   s' <- normalize' s
   case s' of
-    TLam body -> normalize' $ substOut t' body
+    TLam body -> normalize' $ substOutI t' body
     _         -> pure $ TApp s' t'
 
 normalize

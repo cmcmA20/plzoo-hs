@@ -17,30 +17,30 @@ data Term' n where
   TApp   :: Term' n -> Term' n -> Term' n
   deriving (Eq, Show)
 
-weakenCtx :: forall (n :: Nat). Term' n -> Term' ('S n)
-weakenCtx (TFree name) = TFree name
-weakenCtx (TBound idx) = TBound (weakenBound idx)
-weakenCtx (TLam body ) = TLam (weakenCtx body)
-weakenCtx (TApp u v  ) = TApp (weakenCtx u) (weakenCtx v)
+weakenTermBound :: forall (n :: Nat). Term' n -> Term' ('S n)
+weakenTermBound (TFree name) = TFree name
+weakenTermBound (TBound idx) = TBound (weakenBound idx)
+weakenTermBound (TLam body ) = TLam (weakenTermBound body)
+weakenTermBound (TApp u v  ) = TApp (weakenTermBound u) (weakenTermBound v)
 
-substOut :: forall (n :: Nat). SingI n => Term' n -> Term' ('S n) -> Term' n
-substOut _   (TFree name) = TFree name
-substOut rep (TBound idx) = maybe rep TBound (strengthenBoundI idx)
-substOut rep (TLam body ) = TLam (substOut (weakenCtx rep) body)
-substOut rep (TApp u v  ) = TApp (substOut rep u) (substOut rep v)
+substOutI :: forall (n :: Nat). SingI n => Term' n -> Term' ('S n) -> Term' n
+substOutI _   (TFree name) = TFree name
+substOutI rep (TBound idx) = maybe rep TBound (strengthenBoundI idx)
+substOutI rep (TLam body ) = TLam (substOutI (weakenTermBound rep) body)
+substOutI rep (TApp u v  ) = TApp (substOutI rep u) (substOutI rep v)
 
 type SomeTerm :: Type
 data SomeTerm where
   MkSomeTerm :: forall (n :: Nat). Sing n -> Term' n -> SomeTerm
 
 mkLam :: SomeTerm -> SomeTerm
-mkLam (MkSomeTerm SZ      _) = undefined -- FIXME
+mkLam (MkSomeTerm SZ      _) = error "Broken SomeTerm singletons"
 mkLam (MkSomeTerm (SS sn) t) = MkSomeTerm sn (TLam t)
 
 mkApp :: SomeTerm -> SomeTerm -> SomeTerm
 mkApp (MkSomeTerm sm u) (MkSomeTerm sn v) = case sm %~ sn of
   Proved    Refl -> MkSomeTerm sm (TApp u v)
-  Disproved _    -> undefined -- FIXME
+  Disproved _    -> error "Broken SomeTerm singletons"
 
 instance Show SomeTerm where
   show (MkSomeTerm _ t) = show t
@@ -48,7 +48,17 @@ instance Show SomeTerm where
 newtype Term = MkTerm { unTerm :: Term' 'Z }
   deriving Show via Term' 'Z
 
-weakest :: forall (n :: Nat). SingI n => Term' 'Z -> Term' n
-weakest t = case sing @n of
+weakestTermBoundI :: forall (n :: Nat). SingI n => Term' 'Z -> Term' n
+weakestTermBoundI t = case sing @n of
   SZ    -> t
-  SS n' -> withSingI n' (weakenCtx (weakest t))
+  SS n' -> withSingI n' (weakenTermBound (weakestTermBoundI t))
+
+weakenTermIndex :: forall (n :: Nat). Sing n -> Term' n -> Term' ('S n)
+weakenTermIndex _  (TFree name) = TFree name
+weakenTermIndex _  (TBound idx) = TBound (FS idx)
+weakenTermIndex sn (TLam body ) = TLam (weakenTermIndex (SS sn) body)
+weakenTermIndex sn (TApp u v  ) = TApp (weakenTermIndex sn u) (weakenTermIndex sn v)
+
+weakestTermIndex :: forall (n :: Nat). Sing n -> Term' 'Z -> Term' n
+weakestTermIndex SZ      t = t
+weakestTermIndex (SS n') t = weakenTermIndex n' (weakestTermIndex n' t)
