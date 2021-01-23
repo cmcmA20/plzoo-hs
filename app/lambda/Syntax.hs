@@ -2,7 +2,7 @@
 module Syntax where
 
 import           Data.Kind              (Type)
-import           Data.Singletons        (fromSing, Sing, SingI, sing, withSingI)
+import           Data.Singletons        (Sing, SingI, sing, withSingI)
 import           Data.Singletons.Decide
 import           Data.Text              (Text)
 
