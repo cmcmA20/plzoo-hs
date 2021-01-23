@@ -2,64 +2,58 @@
 module Syntax where
 
 import           Data.Kind              (Type)
-import           Data.Singletons        (Sing, SingI, sing, withSingI)
+import           Data.Singletons        (fromSing, Sing, SingI, sing, withSingI)
 import           Data.Singletons.Decide
 import           Data.Text              (Text)
 
 import           Data.Fin
 import           Data.Nat
 
--- | Helper type of lambda terms, indexed by local context (represented as a natural)
+-- | Helper type of lambda terms, indexed by scope (represented as a natural)
 type Term' :: Nat -> Type
 data Term' n where
   TFree  :: Text -> Term' n  -- ^ infinitely many names for free variables
-  TBound :: Fin n -> Term' n -- ^ index of a bound variable never points out of the local context
-  TLam   :: Term' ('S n) -> Term' n -- ^ local context of a lambda's body is extended
-  TApp   :: Term' n -> Term' n -> Term' n -- ^ local contexts of application must be same
+  TBound :: Fin n -> Term' n -- ^ index of a bound variable never points out of the scope
+  TLam   :: Term' ('S n) -> Term' n -- ^ scope of a lambda's body is extended
+  TApp   :: Term' n -> Term' n -> Term' n -- ^ scopes of application must be same
   deriving (Eq, Show)
 
--- | Extends local context
+-- | Extends scope
 weaken :: Term' n -> Term' ('S n)
 weaken (TFree name) = TFree name
 weaken (TBound idx) = TBound (weakenBound idx)
 weaken (TLam body ) = TLam (weaken body)
 weaken (TApp u v  ) = TApp (weaken u) (weaken v)
 
-open' :: forall (n :: Nat). SingI n => Fin ('S n) -> Term' n -> Term' ('S n) -> Term' n
-open' _ _   (TFree name) = TFree name
-open' k rep (TBound idx) =
-  if k == idx
+shift :: forall (n :: Nat). SingI n => Nat -> Term' n -> Term' ('S n)
+shift _      (TFree name) = TFree name
+shift cutOff (TBound idx) = case sing @n of
+  SZ    -> error "Broken Term' singletons"
+  SS sn -> if withSingI sn finToNatI idx < cutOff
+    then weaken $ TBound idx
+    else TBound (FS idx)
+shift cutOff (TLam body ) = TLam (shift (S cutOff) body)
+shift cutOff (TApp u v  ) = TApp (shift cutOff u) (shift cutOff v)
+
+unshift :: forall (n :: Nat). SingI n => Nat -> Term' ('S n) -> Term' n
+unshift _      (TFree name) = TFree name
+unshift cutOff (TBound idx) = case strengthenBoundI idx of
+  Nothing   -> TBound (unsafeFinPredI idx)
+  Just idx' -> if finToNatI idx < cutOff
+    then TBound idx'
+    else TBound (unsafeFinPredI idx)
+unshift cutOff (TLam body ) = TLam (unshift (S cutOff) body)
+unshift cutOff (TApp u v  ) = TApp (unshift cutOff u) (unshift cutOff v)
+
+-- | Opens a term with a replacement term at level m
+open :: forall (n :: Nat). SingI n => Nat -> Term' ('S n) -> Term' ('S n) -> Term' ('S n)
+open _ _   (TFree name) = TFree name
+open m rep (TBound idx) =
+  if finToNatI idx == m
      then rep
-     else case strengthenBoundI idx of
-       Nothing   -> error "Broken Term' singletons"
-       Just idx' -> TBound idx'
-open' k rep (TLam body ) = TLam (open' (FS k) (weaken rep) body)
-open' k rep (TApp u v  ) = TApp (open' k rep u) (open' k rep v)
-
--- | Opens a term with a replacement term
-open :: forall (n :: Nat). SingI n => Term' n -> Term' ('S n) -> Term' n
-open = open' FZ
-
--- | Opens a term with a free variable
-varOpen :: forall (n :: Nat). SingI n => Text -> Term' ('S n) -> Term' n
-varOpen name = open (TFree name)
-
-varClose' :: forall (n :: Nat). SingI n => Fin ('S n) -> Text -> Term' n -> Term' ('S n)
-varClose' k old (TFree name) =
-  if old == name
-     then TBound k
-     else TFree name
-varClose' _ _   (TBound idx) = TBound (weakenBound idx)
-varClose' k old (TLam body ) = TLam (varClose' (FS k) old body)
-varClose' k old (TApp u v  ) = TApp (varClose' k old u) (varClose' k old v)
-
--- | Closes a term with respect to a free variable
-varClose :: SingI n => Text -> Term' n -> Term' ('S n)
-varClose = varClose' FZ
-
--- | Substitute a variable with a term
-substitute :: SingI n => Term' n -> Text -> Term' n -> Term' n
-substitute rep old = open rep . varClose old
+     else TBound idx
+open m rep (TLam body ) = TLam $ open (S m) (shift Z rep) body
+open m rep (TApp u v  ) = TApp (open m rep u) (open m rep v)
 
 -- | An existential for any helper
 type SomeTerm :: Type

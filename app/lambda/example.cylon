@@ -55,7 +55,6 @@ fold := fix (λλλλ match _0 _2 (λλ _3 _1 (_5 _4 _3 _0))) ;
 succ := λλλ _1 (_2 _1 _0) ;
 
 + := λλλλ _3 _1 (_2 _1 _0) ;
--- + := λλλλ (_3 _1) ((_2 _1) _0) ;
 
 * := λλλλ (_3 (_2 _1)) _0 ;
 
@@ -63,7 +62,7 @@ succ := λλλ _1 (_2 _1 _0) ;
 
 iszero := λ (_0 (K false)) true ;
 
-pred := λ second (_0 (λ pair (succ (first _0)) (first _0)) (pair _0 _0)) ;
+pred := λ second (_0 (λ pair (succ (first _0)) (first _0)) (pair 0 0)) ;
 
 == := fix (λλλ if (iszero _1) (iszero _0) (_2 (pred _1) (pred _0))) ;
 
