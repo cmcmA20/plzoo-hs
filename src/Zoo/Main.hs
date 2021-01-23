@@ -7,28 +7,29 @@ import           Control.Algebra
 import           Control.Carrier.Error.Church
 import           Control.Carrier.Reader
 import           Control.Carrier.State.Strict
-import qualified Control.Concurrent              as S
+import qualified Control.Concurrent           as S
 import           Control.Effect.Exception
 import           Control.Effect.Lift
 import           Control.Effect.Runtime
 import           Control.Lens
-import           Control.Monad (forever, forM_, unless, void, when)
-import           Data.Generics.Labels ()
-import           Data.Text (Text)
-import qualified Data.Text                       as T
-import qualified Data.Text.IO                    as TIO
-import qualified GHC.IO.Exception                as S
+import           Control.Monad                (forM_, forever, unless, void,
+                                               when)
+import           Data.Generics.Labels         ()
+import           Data.Text                    (Text)
+import qualified Data.Text                    as T
+import qualified Data.Text.IO                 as TIO
+import qualified GHC.IO.Exception             as S
 import           Options.Applicative
-import           Prelude hiding (readFile)
-import qualified System.Exit                     as S
-import qualified System.Info                     as S
-import qualified System.IO                       as S
-import qualified System.Posix.Signals            as S
+import           Prelude                      hiding (readFile)
+import qualified System.Exit                  as S
+import qualified System.IO                    as S
+import qualified System.Info                  as S
+import qualified System.Posix.Signals         as S
 
-import Zoo.Core
-import Zoo.Debug
-import Zoo.Error
-import Zoo.Options
+import           Zoo.Core
+import           Zoo.Debug
+import           Zoo.Error
+import           Zoo.Options
 
 runCommand
   :: forall cmd sem ctx sig m

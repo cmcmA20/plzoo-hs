@@ -1,13 +1,13 @@
 -- | Abstract syntax of internal expressions.
 module Syntax where
 
-import Data.Kind ( Type )
-import Data.Singletons.Decide
-import Data.Singletons ( sing, Sing, SingI, withSingI )
-import Data.Text ( Text )
+import           Data.Kind              (Type)
+import           Data.Singletons        (Sing, SingI, sing, withSingI)
+import           Data.Singletons.Decide
+import           Data.Text              (Text)
 
-import Data.Fin
-import Data.Nat
+import           Data.Fin
+import           Data.Nat
 
 -- | Helper type of lambda terms, indexed by local context (represented as a natural)
 type Term' :: Nat -> Type

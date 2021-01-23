@@ -5,10 +5,10 @@ module Control.Carrier.Runtime.IO
 
 import           Control.Algebra
 import           Control.Effect.Runtime
-import           Control.Monad.IO.Class (liftIO, MonadIO)
-import           Data.Kind (Type)
-import qualified Data.Text.IO                    as TIO
-import qualified System.Exit                     as S
+import           Control.Monad.IO.Class (MonadIO, liftIO)
+import           Data.Kind              (Type)
+import qualified Data.Text.IO           as TIO
+import qualified System.Exit            as S
 
 type CarrierKind = Type -> Type
 

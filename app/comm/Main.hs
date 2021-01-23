@@ -6,18 +6,18 @@ import           Control.Carrier.Runtime.IO
 import           Control.Carrier.State.Strict
 import           Control.Carrier.Throw.Either
 import           Control.Lens
-import           Data.Bifunctor (first)
-import           Data.Text (Text)
-import qualified Data.Text as T
-import           Data.Word (Word16)
-import           GHC.Generics (Generic)
+import           Data.Bifunctor               (first)
+import           Data.Text                    (Text)
+import qualified Data.Text                    as T
+import           Data.Word                    (Word16)
+import           GHC.Generics                 (Generic)
 import           Options.Applicative
 
-import qualified Compile as C
-import qualified Lexer   as L
-import qualified Machine as M
-import qualified Parser  as P
-import qualified Syntax  as S
+import qualified Compile                      as C
+import qualified Lexer                        as L
+import qualified Machine                      as M
+import qualified Parser                       as P
+import qualified Syntax                       as S
 import           Zoo
 
 data Clo = MkClo

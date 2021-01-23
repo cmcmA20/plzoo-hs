@@ -1,10 +1,10 @@
 -- Evaluation of expressions, given as big step semantics.
 module Eval where
 
-import Control.Effect.Throw
+import           Control.Effect.Throw
 
-import Syntax
-import Zoo
+import           Syntax
+import           Zoo
 
 type Sem = Integer
 

@@ -1,9 +1,9 @@
 -- | Location helpers
 module Zoo.Location where
 
-import           Data.Kind (Type)
-import           Data.Text (Text)
-import qualified Data.Text                       as T
+import           Data.Kind    (Type)
+import           Data.Text    (Text)
+import qualified Data.Text    as T
 import           GHC.Generics (Generic)
 
 data Location

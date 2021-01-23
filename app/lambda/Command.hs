@@ -1,14 +1,14 @@
 module Command where
 
-import Control.Carrier.Reader
-import Control.Carrier.State.Strict
-import Control.Effect.Runtime
-import Control.Effect.Throw
-import Control.Lens
-import Data.Text (Text)
-import GHC.Generics (Generic)
+import           Control.Carrier.Reader
+import           Control.Carrier.State.Strict
+import           Control.Effect.Runtime
+import           Control.Effect.Throw
+import           Control.Lens
+import           Data.Text                    (Text)
+import           GHC.Generics                 (Generic)
 
-import qualified Context as Con
+import qualified Context                      as Con
 import           Normalize
 import           Syntax
 import           Zoo
