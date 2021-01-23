@@ -1,7 +1,7 @@
 cabal-version:       3.0
 
 name:                plzoo-hs
-version:             0.3.0.0
+version:             0.4.0.0
 synopsis:            The Programming Languages Zoo
 -- description:
 -- bug-reports:

@@ -1,5 +1,12 @@
 # Revision history for plzoo-hs
 
+## 0.4.0.0 -- 2021-01-23
+
+* Modularized Zoo
+
+Released languages:
+* lambda
+
 ## 0.3.0.0 -- 2021-01-11
 
 * Languages can have non-trivial effect interleaving.
