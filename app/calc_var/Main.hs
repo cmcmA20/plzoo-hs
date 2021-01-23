@@ -5,13 +5,13 @@ import           Control.Carrier.Reader
 import           Control.Carrier.Runtime.Pure
 import           Control.Effect.Throw
 import qualified Data.HashMap.Strict          as HM
-import           Data.Text (Text)
+import           Data.Text                    (Text)
 import qualified Data.Text                    as T
 
-import qualified Eval   as E
-import qualified Lexer  as L
-import qualified Parser as P
-import qualified Syntax as S
+import qualified Eval                         as E
+import qualified Lexer                        as L
+import qualified Parser                       as P
+import qualified Syntax                       as S
 import           Zoo
 
 type Clo = ()

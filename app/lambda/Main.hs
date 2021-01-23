@@ -4,16 +4,16 @@ import           Control.Carrier.Lift
 import           Control.Carrier.Reader
 import           Control.Carrier.Runtime.IO
 import           Control.Effect.Throw
-import           Data.Text (Text)
-import qualified Data.Text as T
+import           Data.Text                  (Text)
+import qualified Data.Text                  as T
 
-import qualified Command as Cmd
-import qualified Context as Con
+import qualified Command                    as Cmd
+import qualified Context                    as Con
 import           Data.Nat
-import qualified Lexer as L
-import qualified Normalize as N
-import qualified Parser as P
-import qualified Printer as P
+import qualified Lexer                      as L
+import qualified Normalize                  as N
+import qualified Parser                     as P
+import qualified Printer                    as P
 import           Zoo
 
 type Clo = ()

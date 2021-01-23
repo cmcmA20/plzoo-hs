@@ -1,20 +1,20 @@
 module Parser where
 
-import Control.Applicative ((<|>), many)
-import Control.Effect.State
-import Control.Lens ((&), (%~))
-import Data.Functor (($>))
-import Data.List (foldl')
-import Data.Singletons
-import Data.Text (Text)
-import Prelude hiding (pred)
+import           Control.Applicative  (many, (<|>))
+import           Control.Effect.State
+import           Control.Lens         ((%~), (&))
+import           Data.Functor         (($>))
+import           Data.List            (foldl')
+import           Data.Singletons
+import           Data.Text            (Text)
+import           Prelude              hiding (pred)
 
-import qualified Command   as C
+import qualified Command              as C
 import           Data.Fin
 import           Data.Nat
-import qualified Lexer     as L
-import qualified Normalize as N
-import qualified Syntax    as S
+import qualified Lexer                as L
+import qualified Normalize            as N
+import qualified Syntax               as S
 import           Zoo
 
 file :: Parser L.Token Nat [C.Cmd]

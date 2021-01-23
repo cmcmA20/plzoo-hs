@@ -1,12 +1,12 @@
 module Normalize where
 
-import Control.Effect.Reader
-import Control.Effect.Throw
-import Data.Singletons (SingI)
+import           Control.Effect.Reader
+import           Control.Effect.Throw
+import           Data.Singletons       (SingI)
 
-import Context
-import Syntax
-import Zoo
+import           Context
+import           Syntax
+import           Zoo
 
 data Depth = DShallow | DDeep
   deriving Show

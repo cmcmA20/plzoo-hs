@@ -8,19 +8,19 @@ module Machine where
 import           Control.Carrier.State.Strict
 import           Control.Carrier.Throw.Either
 import           Control.Effect.Runtime
-import           Control.Exception (Exception)
+import           Control.Exception            (Exception)
 import           Control.Lens
-import           Control.Monad (when)
-import           Data.IntMap.Strict (IntMap)
-import qualified Data.IntMap.Strict as IM
-import           Data.Text (Text)
-import qualified Data.Text as T
-import           Data.Word (Word16)
+import           Control.Monad                (when)
+import           Data.IntMap.Strict           (IntMap)
+import qualified Data.IntMap.Strict           as IM
+import           Data.Text                    (Text)
+import qualified Data.Text                    as T
+import           Data.Word                    (Word16)
 import           Formatting
-import           GHC.Generics (Generic)
-import           Text.Read (readMaybe)
+import           GHC.Generics                 (Generic)
+import           Text.Read                    (readMaybe)
 
-import Zoo
+import           Zoo
 
 -- | The machine instructions.
 data Instruction
@@ -48,24 +48,24 @@ shInst :: Text -> Word16 -> String
 shInst = formatToString ((right 6 ' ' %. stext) % " " % "0x" %(left 4 '0' %. hex))
 
 instance Show Instruction where
-  show INOP = "NOP"
-  show (ISET x) = shInst "SET" x
-  show (IGET x) = shInst "GET" x
+  show INOP      = "NOP"
+  show (ISET x)  = shInst "SET" x
+  show (IGET x)  = shInst "GET" x
   show (IPUSH x) = shInst "PUSH" x
-  show IADD = "ADD"
-  show ISUB = "SUB"
-  show IMUL = "MUL"
-  show IDIV = "DIV"
-  show IMOD = "MOD"
-  show IEQ = "EQ"
-  show ILT = "LT"
-  show IAND = "AND"
-  show IOR = "OR"
-  show INOT = "NOT"
-  show (IJMP x) = shInst "JMP" x
+  show IADD      = "ADD"
+  show ISUB      = "SUB"
+  show IMUL      = "MUL"
+  show IDIV      = "DIV"
+  show IMOD      = "MOD"
+  show IEQ       = "EQ"
+  show ILT       = "LT"
+  show IAND      = "AND"
+  show IOR       = "OR"
+  show INOT      = "NOT"
+  show (IJMP x)  = shInst "JMP" x
   show (IJMPZ x) = shInst "JMPZ" x
-  show IPRINT = "PRINT"
-  show IREAD = "READ"
+  show IPRINT    = "PRINT"
+  show IREAD     = "READ"
 
 newtype Program = MkProgram { unProgram :: IntMap Instruction }
 

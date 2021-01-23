@@ -3,9 +3,9 @@ module Control.Carrier.Runtime.Pure
   , RuntimePureC(..)
   ) where
 
-import Control.Algebra
-import Control.Effect.Runtime
-import Data.Kind (Type)
+import           Control.Algebra
+import           Control.Effect.Runtime
+import           Data.Kind              (Type)
 
 type CarrierKind = Type -> Type
 
