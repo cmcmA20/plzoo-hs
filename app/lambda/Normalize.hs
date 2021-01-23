@@ -5,6 +5,7 @@ import           Control.Effect.Throw
 import           Data.Singletons       (SingI)
 
 import           Context
+import           Data.Nat
 import           Syntax
 import           Zoo
 
@@ -42,7 +43,7 @@ normalize' (TApp s t  ) = do
     EEager -> normalize' t
   s' <- normalize' s
   case s' of
-    TLam body -> normalize' $ open t' body
+    TLam body -> normalize' $ unshift Z $ open Z (shift Z t') body
     _         -> pure $ TApp s' t'
 
 normalize

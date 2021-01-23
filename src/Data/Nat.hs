@@ -20,11 +20,15 @@ instance SDecide Nat where
   SS _ %~ SZ   = Disproved (error "Broken Nat singletons")
   SZ   %~ SS _ = Disproved (error "Broken Nat singletons")
   SS m %~ SS n = case m %~ n of
-    Proved    p -> Proved (unsafeCoerce p) -- trust me, I'm a doctor
+    Proved    p -> Proved (unsafeCoerce p) -- data constructors are injective in Haskell
     Disproved _ -> Disproved (error "Broken Nat singletons")
 
-suc :: Nat -> Nat
-suc = S
+rec :: a -> (a -> a) -> Nat -> a
+rec !z _ Z     = z
+rec !z f (S n) = rec (f z) f n
+
+succ :: Nat -> Nat
+succ = S
 
 pred' :: Nat -> Maybe Nat
 pred' Z     = Nothing
@@ -45,5 +49,4 @@ integerToNat i
   integerToNat' j = S (integerToNat' (j - 1))
 
 natToInteger :: Nat -> Integer
-natToInteger Z     = 0
-natToInteger (S n) = 1 + natToInteger n
+natToInteger = rec 0 (+1)

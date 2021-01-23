@@ -7,7 +7,7 @@ import           Data.Functor         (($>))
 import           Data.List            (foldl')
 import           Data.Singletons
 import           Data.Text            (Text)
-import           Prelude              hiding (pred)
+import           Prelude              hiding (pred, succ)
 
 import qualified Command              as C
 import           Data.Fin
@@ -76,7 +76,7 @@ topExpr = do
     S.MkSomeTerm _  _ -> pFail
 
 lamDown :: forall i. Parser i Nat ()
-lamDown = MkParser $ modify @(ParserState i Nat) (& #userState %~ suc)
+lamDown = MkParser $ modify @(ParserState i Nat) (& #userState %~ succ)
 
 lamUp :: forall i. Parser i Nat ()
 lamUp = MkParser $ modify @(ParserState i Nat) (& #userState %~ pred)

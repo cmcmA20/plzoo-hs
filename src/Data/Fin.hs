@@ -21,6 +21,13 @@ instance Show (Fin n) where
   show (FS FZ) = "FS FZ"
   show (FS k ) = "FS (" <> show k <> ")"
 
+unsafeFinPredI :: forall (n :: Nat). SingI n => Fin ('S n) -> Fin n
+unsafeFinPredI k = case sing @n of
+  SZ   -> error "Broken Fin singletons"
+  SS _ -> case k of
+    FZ    -> FZ
+    FS k' -> k'
+
 -- | index stays the same, bound is loosened
 weakenBound :: forall (n :: Nat). Fin n -> Fin ('S n)
 weakenBound FZ     = FZ
