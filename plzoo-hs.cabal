@@ -173,3 +173,14 @@ executable utlc
                      , StandaloneKindSignatures
                      , TypeApplications
   ghc-options:         -Wall
+
+executable stlc
+  main-is:             Main.hs
+  other-modules:       Syntax
+  build-depends:       array
+                     , base >=4.14 && <4.15
+  build-tool-depends:  alex:alex
+  hs-source-dirs:      app/stlc
+  default-language:    Haskell2010
+  default-extensions:
+  ghc-options:         -Wall
