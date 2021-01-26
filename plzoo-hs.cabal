@@ -138,7 +138,7 @@ executable comm
                      , TypeApplications
   ghc-options:         -Wall
 
-executable lambda
+executable utlc
   main-is:             Main.hs
   other-modules:       Command
                      , Context
@@ -157,7 +157,7 @@ executable lambda
                      , text
                      , unordered-containers
   build-tool-depends:  alex:alex
-  hs-source-dirs:      app/lambda
+  hs-source-dirs:      app/utlc
   default-language:    Haskell2010
   default-extensions:  BlockArguments
                      , ConstraintKinds
