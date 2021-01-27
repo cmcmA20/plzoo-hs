@@ -38,7 +38,7 @@ pp = MkLangPP $ \i -> pure $ T.pack $ show i
 main :: IO ()
 main
   = runM
-  . runRuntimePureC
+  . runRuntimePureC []
   . runReader ln
   . runReader opts
   . runReader ini

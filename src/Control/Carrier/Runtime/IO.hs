@@ -16,7 +16,7 @@ newtype RuntimeIOC (m :: CarrierKind) (a :: Type) = MkRuntimeIOC { runRuntimeIOC
   deriving (Applicative, Functor, Monad, MonadIO)
 
 instance (MonadIO m, Algebra sig m) => Algebra (Runtime :+: sig) (RuntimeIOC m) where
-  alg _   (L RExit)      c = c <$ liftIO S.exitSuccess
-  alg _   (L RRead)      c = (<$ c) <$> liftIO TIO.getLine
-  alg _   (L (RWrite t)) c = c <$ liftIO (TIO.putStr t)
-  alg hdl (R other)      c = MkRuntimeIOC $ alg (runRuntimeIOC . hdl) other c
+  alg _   (L (RExit code)) c = c <$ liftIO (S.exitWith code)
+  alg _   (L RRead)        c = (<$ c) <$> liftIO TIO.getLine
+  alg _   (L (RWrite t))   c = c <$ liftIO (TIO.putStr t)
+  alg hdl (R other)        c = MkRuntimeIOC $ alg (runRuntimeIOC . hdl) other c

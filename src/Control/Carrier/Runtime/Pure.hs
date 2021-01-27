@@ -5,19 +5,28 @@ module Control.Carrier.Runtime.Pure
 
 import           Control.Algebra
 import           Control.Effect.Runtime
-import           Data.Kind              (Type)
+import           Control.Monad.Trans.Except
+import           Control.Monad.Trans.State
+import           Control.Monad.Trans.Writer
+import           Data.Kind                  (Type)
+import           Data.Text                  (Text)
+import           System.Exit                (ExitCode (..))
 
 type CarrierKind = Type -> Type
 
--- TODO: make it take a Text input (representing stdin) and return a Text (representing stdout)
+type InputStream  = [Text]
+type OutputStream = [Text]
 
--- | drops any I/O
-newtype RuntimePureC (m :: CarrierKind) (a :: Type) = MkRuntimePureC { runRuntimePureC :: m a }
-  deriving (Applicative, Functor, Monad)
+-- completely ignores temporal aspect of IO
+newtype RuntimePureC (m :: CarrierKind) (a :: Type) =
+  MkRuntimePureC { runRuntimePureC :: InputStream -> m ((Either ExitCode a, InputStream), OutputStream) }
+  deriving (Functor, Applicative, Monad) via (ExceptT ExitCode (StateT InputStream (WriterT OutputStream m)))
 
+-- seems clunky
 instance Algebra sig m => Algebra (Runtime :+: sig) (RuntimePureC m) where
-  alg hdl si ct = MkRuntimePureC case si of
-    L RExit      -> pure ct -- FIXME feels wrong
-    L RRead      -> pure ("" <$ ct)
-    L (RWrite _) -> pure ct
-    R other      -> alg (runRuntimePureC . hdl) other ct
+ alg _   (L (RExit code)) _  = MkRuntimePureC \is -> pure ((Left code, is), [])
+ alg _   (L RRead)        ct = MkRuntimePureC \case
+   []     -> pure ((Left (ExitFailure 1), []), ["Program blocked on a reading operation"]) -- an artificial stuff
+   (i:is) -> pure ((Right (i <$ ct), is), [])
+ alg _   (L (RWrite t))   ct = MkRuntimePureC \is -> pure ((Right ct, is), [t])
+ alg hdl (R other)        ct = undefined -- FIXME

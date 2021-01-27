@@ -11,6 +11,7 @@ import           GHC.Generics                 (Generic)
 import qualified Context                      as Con
 import           Normalize
 import           Syntax
+import           System.Exit                  (ExitCode (ExitSuccess))
 import           Zoo
 
 data Cmd
@@ -78,7 +79,7 @@ evalCmd (CDefine name value) = do
     Just _  -> throwError (LERuntime $ locate Nothing $ name <> " already exists")
 evalCmd CHelp = pure $ Left helpMessage
 evalCmd CQuit = do
-  rExit
+  rExit ExitSuccess
   pure $ Left "bye"
 
 helpMessage :: Text
