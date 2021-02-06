@@ -176,11 +176,23 @@ executable utlc
 
 executable stlc
   main-is:             Main.hs
-  other-modules:       Syntax
+  other-modules:       Printer
+                     , Syntax
+                     , Typecheck
   build-depends:       array
                      , base >=4.14 && <4.15
+                     , fused-effects
+                     , plzoo-hs
+                     , text
+                     , unordered-containers
   build-tool-depends:  alex:alex
   hs-source-dirs:      app/stlc
   default-language:    Haskell2010
-  default-extensions:
+  default-extensions:  DataKinds
+                     , GADTs
+                     , KindSignatures
+                     , OverloadedStrings
+                     , RankNTypes
+                     , StandaloneKindSignatures
+                     , TypeApplications
   ghc-options:         -Wall
