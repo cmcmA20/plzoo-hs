@@ -22,19 +22,19 @@ library
                       , Data.Nat
                       , Zoo
   other-modules:        Zoo.Core
-                      , Zoo.Debug
                       , Zoo.Error
                       , Zoo.Location
                       , Zoo.Main
                       , Zoo.Options
                       , Zoo.Parser
+                      , Zoo.Printer
   build-depends:        base >= 4.14 && <4.15
                       , fused-effects >= 1.1.0.0
                       , fused-effects-exceptions
                       , generic-lens
                       , lens
                       , optparse-applicative
-                      , pretty-simple
+                      , prettyprinter
                       , singletons
                       , text
                       , unix

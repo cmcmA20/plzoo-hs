@@ -10,12 +10,10 @@ import           GHC.Generics             (Generic)
 import           Options.Applicative
 
 import           Zoo.Core
-import           Zoo.Debug
 
 data DefaultOpts = MkDefaultOpts
   { nonInteractive :: !Bool
   , onlyLangInfo   :: !Bool
-  , metaDebug      :: !Debug
   , filesToLoad    :: ![Text] }
   deriving (Generic, Show)
 
@@ -25,10 +23,6 @@ defaultOpts = MkDefaultOpts
     <> help "Do not run the interactive toplevel")
   <*> switch (short 'v'
     <> help "Print language information and exit")
-  <*> option auto (long "meta-debug"
-    <> showDefault
-    <> value defaultDebug
-    <> help "Print debugging info")
   <*> many (strOption (short 'l'
     <> help "Load file into the initial environment"))
 

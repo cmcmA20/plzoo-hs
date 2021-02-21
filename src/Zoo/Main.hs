@@ -27,7 +27,6 @@ import qualified System.Info                  as S
 import qualified System.Posix.Signals         as S
 
 import           Zoo.Core
-import           Zoo.Debug
 import           Zoo.Error
 import           Zoo.Options
 
@@ -87,7 +86,6 @@ printResult v = do
 toplevel
   :: forall clo cmd sem ctx sig m
   .  ( MetaRTS clo cmd sem ctx sig m
-     , Has (Reader Debug) sig m
      , Has (State ctx) sig m
      , Show cmd
      , Show sem
@@ -181,7 +179,7 @@ zooMain = do
     pure () -- TODO revert default line wrapper handler
 
   initState <- asks @(LangInit clo ctx) unLangInit
-  runReader (defOpts ^. #metaDebug) $ evalState (initState opts) do
+  evalState (initState opts) do
     forM_ (defOpts ^. #filesToLoad) $ useFile @clo @cmd @sem @ctx
     unless (defOpts ^. #nonInteractive) $
      toplevel @clo @cmd @sem @ctx
