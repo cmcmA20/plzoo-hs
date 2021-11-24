@@ -1,16 +1,16 @@
 -- | Error handling
 module Zoo.Error where
 
-import           Control.Algebra
-import           Control.Carrier.Error.Church
-import           Control.Effect.Exception
-import           Control.Effect.Lift
-import           Data.Generics.Labels         ()
-import           Data.Text                    (Text)
-import qualified Data.Text                    as T
-import qualified Data.Text.IO                 as TIO
+import Control.Algebra
+import Control.Carrier.Error.Church
+import Control.Effect.Exception
+import Control.Effect.Lift
+import Data.Generics.Labels ()
+import Data.Text (Text)
+import Data.Text qualified as T
+import Data.Text.IO qualified as TIO
 
-import           Zoo.Location
+import Zoo.Location
 
 maybeThrowIO :: (Has (Lift IO) sig m, Exception e) => e -> Maybe a -> m a
 maybeThrowIO err Nothing  = throwIO err

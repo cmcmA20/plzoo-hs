@@ -1,10 +1,10 @@
 -- | Location helpers
 module Zoo.Location where
 
-import           Data.Kind    (Type)
-import           Data.Text    (Text)
-import qualified Data.Text    as T
-import           GHC.Generics (Generic)
+import Data.Kind (Type)
+import Data.Text (Text)
+import Data.Text qualified as T
+import GHC.Generics (Generic)
 
 data Location
   = LNowhere -- ^ No location

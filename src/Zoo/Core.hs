@@ -1,17 +1,17 @@
 -- | This file contains all the common code used by the languages implemented in the PL Zoo.
 module Zoo.Core where
 
-import           Control.Algebra
-import           Control.Carrier.Error.Church
-import           Control.Carrier.Reader
-import           Control.Carrier.State.Strict
-import           Control.Effect.Exception
-import           Control.Effect.Runtime
-import           Data.Kind                    (Type)
-import           Data.Text                    (Text)
-import           Options.Applicative
+import Control.Algebra
+import Control.Carrier.Error.Church
+import Control.Carrier.Reader
+import Control.Carrier.State.Strict
+import Control.Effect.Exception
+import Control.Effect.Runtime
+import Data.Kind (Type)
+import Data.Text (Text)
+import Options.Applicative
 
-import           Zoo.Error
+import Zoo.Error
 
 type SigKind     = (Type -> Type) -> Type -> Type
 type CarrierKind = Type -> Type

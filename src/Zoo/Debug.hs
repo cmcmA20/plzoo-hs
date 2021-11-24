@@ -1,9 +1,9 @@
 module Zoo.Debug where
 
-import           Control.Effect.Lift
-import           Control.Effect.Reader
-import           Control.Monad         (when)
-import           Text.Pretty.Simple
+import Control.Effect.Lift
+import Control.Effect.Reader
+import Control.Monad (when)
+import Text.Pretty.Simple
 
 data Debug = MkDebug
   { lexer   :: !Bool

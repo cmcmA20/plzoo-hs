@@ -5,9 +5,9 @@ module Control.Effect.Runtime
   , rWrite
   ) where
 
-import           Control.Algebra
-import           Data.Kind       (Type)
-import           Data.Text       (Text)
+import Control.Algebra
+import Data.Kind (Type)
+import Data.Text (Text)
 
 type CarrierKind = Type -> Type
 

@@ -1,11 +1,11 @@
 module Data.Nat where
 
-import           Data.Kind              (Type)
-import           Data.Maybe             (fromMaybe)
-import           Data.Singletons.Decide
-import           Data.Singletons.TH     (genSingletons)
-import           Prelude                hiding (pred)
-import           Unsafe.Coerce          (unsafeCoerce)
+import Data.Kind (Type)
+import Data.Maybe (fromMaybe)
+import Data.Singletons.Decide
+import Data.Singletons.TH (genSingletons)
+import Prelude hiding (pred)
+import Unsafe.Coerce (unsafeCoerce)
 
 type Nat :: Type
 data Nat where

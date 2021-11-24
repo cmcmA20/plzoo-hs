@@ -1,16 +1,16 @@
 -- | Command line options parsing
 module Zoo.Options where
 
-import           Control.Algebra
-import           Control.Carrier.Reader
-import           Control.Effect.Exception
-import           Control.Effect.Lift
-import           Data.Text                (Text)
-import           GHC.Generics             (Generic)
-import           Options.Applicative
+import Control.Algebra
+import Control.Carrier.Reader
+import Control.Effect.Exception
+import Control.Effect.Lift
+import Data.Text (Text)
+import GHC.Generics (Generic)
+import Options.Applicative
 
-import           Zoo.Core
-import           Zoo.Debug
+import Zoo.Core
+import Zoo.Debug
 
 data DefaultOpts = MkDefaultOpts
   { nonInteractive :: !Bool

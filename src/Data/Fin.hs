@@ -1,9 +1,9 @@
 module Data.Fin where
 
-import           Data.Kind       (Type)
-import           Data.Singletons (Sing, SingI, sing, withSingI)
+import Data.Kind (Type)
+import Data.Singletons (Sing, SingI, sing, withSingI)
 
-import           Data.Nat
+import Data.Nat
 
 type Fin :: Nat -> Type
 data Fin n where

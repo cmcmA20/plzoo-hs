@@ -50,6 +50,7 @@ library
                       , FlexibleInstances
                       , GADTs
                       , GeneralizedNewtypeDeriving
+                      , ImportQualifiedPost
                       , InstanceSigs
                       , KindSignatures
                       , MultiParamTypeClasses
@@ -82,7 +83,8 @@ executable calc
                      , happy:happy
   hs-source-dirs:      app/calc
   default-language:    Haskell2010
-  default-extensions:  OverloadedStrings
+  default-extensions:  ImportQualifiedPost
+                     , OverloadedStrings
                      , TypeApplications
   ghc-options:         -Wall
 
@@ -103,7 +105,8 @@ executable calc_var
                      , happy:happy
   hs-source-dirs:      app/calc_var
   default-language:    Haskell2010
-  default-extensions:  OverloadedStrings
+  default-extensions:  ImportQualifiedPost
+                     , OverloadedStrings
                      , TypeApplications
   ghc-options:         -Wall
 
@@ -132,6 +135,7 @@ executable comm
                      , DeriveGeneric
                      , DuplicateRecordFields
                      , GeneralizedNewtypeDeriving
+                     , ImportQualifiedPost
                      , OverloadedLabels
                      , OverloadedStrings
                      , TupleSections
@@ -165,6 +169,7 @@ executable utlc
                      , DeriveGeneric
                      , DerivingVia
                      , GADTs
+                     , ImportQualifiedPost
                      , KindSignatures
                      , OverloadedLabels
                      , OverloadedStrings

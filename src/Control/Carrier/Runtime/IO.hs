@@ -3,12 +3,12 @@ module Control.Carrier.Runtime.IO
   , RuntimeIOC(..)
   ) where
 
-import           Control.Algebra
-import           Control.Effect.Runtime
-import           Control.Monad.IO.Class (MonadIO, liftIO)
-import           Data.Kind              (Type)
-import qualified Data.Text.IO           as TIO
-import qualified System.Exit            as S
+import Control.Algebra
+import Control.Effect.Runtime
+import Control.Monad.IO.Class (MonadIO, liftIO)
+import Data.Kind (Type)
+import Data.Text.IO qualified as TIO
+import System.Exit qualified as S
 
 type CarrierKind = Type -> Type
 

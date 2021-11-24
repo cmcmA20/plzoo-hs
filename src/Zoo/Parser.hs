@@ -1,15 +1,15 @@
 module Zoo.Parser where
 
-import           Control.Applicative
-import           Control.Carrier.State.Strict
-import           Control.Carrier.Throw.Either
-import           Control.Lens
-import           Data.Kind                    (Type)
-import           GHC.Generics                 (Generic)
+import Control.Applicative
+import Control.Carrier.State.Strict
+import Control.Carrier.Throw.Either
+import Control.Lens
+import Data.Kind (Type)
+import GHC.Generics (Generic)
 
-import           Zoo.Core
-import           Zoo.Error
-import           Zoo.Location
+import Zoo.Core
+import Zoo.Error
+import Zoo.Location
 
 data ParserState (i :: Type) (u :: Type) = MkParserState
   { inputStream :: [i]
