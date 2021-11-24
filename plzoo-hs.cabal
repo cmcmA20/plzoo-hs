@@ -35,7 +35,7 @@ library
                       , lens
                       , optparse-applicative
                       , pretty-simple
-                      , singletons
+                      , singletons == 2.7
                       , text
                       , unix
   hs-source-dirs:       src
