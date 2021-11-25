@@ -49,7 +49,7 @@ instance Show SyntaxError where
 
 instance Exception SyntaxError
 
--- dirty
+-- FIXME dirty
 alexErrorToSyntaxError :: String -> SyntaxError
 alexErrorToSyntaxError (words -> ["lexical", "error", "at", "line", ls, "column", cs]) =
   SELex $ LLocation (read (init ls)) (read cs)

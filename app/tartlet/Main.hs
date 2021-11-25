@@ -2,7 +2,7 @@ module Main where
 
 import           Control.Carrier.Lift
 import           Control.Carrier.Reader
-import           Control.Carrier.Runtime.IO
+import           Control.Carrier.Runtime.Pure
 import           Control.Effect.Throw
 import           Data.Text                  (Text)
 import qualified Data.Text                  as T
@@ -34,8 +34,7 @@ pp = MkLangPP undefined
 
 main :: IO ()
 main
-  = runM
-  . runRuntimeIOC
+  = withoutRuntime
   . runReader ln
   . runReader opts
   . runReader ini
