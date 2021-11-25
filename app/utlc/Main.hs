@@ -1,25 +1,25 @@
 module Main where
 
-import           Control.Carrier.Lift
-import           Control.Carrier.Reader
-import           Control.Carrier.Runtime.IO
-import           Control.Effect.Throw
-import           Data.Text                  (Text)
-import qualified Data.Text                  as T
+import Control.Carrier.Lift
+import Control.Carrier.Reader
+import Control.Carrier.Runtime.Pure
+import Control.Effect.Throw
+import Data.Text (Text)
+import Data.Text qualified as T
 
-import qualified Command                    as Cmd
-import qualified Context                    as Con
-import           Data.Nat
-import qualified Lexer                      as L
-import qualified Normalize                  as N
-import qualified Parser                     as P
-import qualified Printer                    as P
-import           Zoo
+import Command qualified as Cmd
+import Context qualified as Con
+import Data.Nat
+import Lexer qualified as L
+import Normalize qualified as N
+import Parser qualified as P
+import Printer qualified as P
+import Zoo
 
 type Clo = ()
 
 ln :: LangName
-ln = MkLangName "lambda"
+ln = MkLangName "utlc"
 
 opts :: LangOpts Clo
 opts = MkLangOpts $ pure ()
@@ -52,8 +52,7 @@ pp = MkLangPP ppHelper
 
 main :: IO ()
 main
-  = runM
-  . runRuntimeIOC
+  = withoutRuntime
   . runReader ln
   . runReader opts
   . runReader ini

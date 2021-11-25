@@ -1,18 +1,18 @@
 module Main where
 
-import           Control.Carrier.Lift
-import           Control.Carrier.Reader
-import           Control.Carrier.Runtime.Pure
-import           Control.Effect.Throw
-import qualified Data.HashMap.Strict          as HM
-import           Data.Text                    (Text)
-import qualified Data.Text                    as T
+import Control.Carrier.Lift
+import Control.Carrier.Reader
+import Control.Carrier.Runtime.Pure
+import Control.Effect.Throw
+import Data.HashMap.Strict qualified as HM
+import Data.Text (Text)
+import Data.Text qualified as T
 
-import qualified Eval                         as E
-import qualified Lexer                        as L
-import qualified Parser                       as P
-import qualified Syntax                       as S
-import           Zoo
+import Eval qualified as E
+import Lexer qualified as L
+import Parser qualified as P
+import Syntax qualified as S
+import Zoo
 
 type Clo = ()
 
@@ -38,8 +38,7 @@ pp = MkLangPP $ \i -> pure $ T.pack $ show i
 
 main :: IO ()
 main
-  = runM
-  . runRuntimePureC
+  = withoutRuntime
   . runReader ln
   . runReader opts
   . runReader ini

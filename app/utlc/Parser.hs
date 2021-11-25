@@ -1,21 +1,21 @@
 module Parser where
 
-import           Control.Applicative  (many, (<|>))
-import           Control.Effect.State
-import           Control.Lens         ((%~), (&))
-import           Data.Functor         (($>))
-import           Data.List            (foldl')
-import           Data.Singletons
-import           Data.Text            (Text)
-import           Prelude              hiding (pred, succ)
+import Control.Applicative (many, (<|>))
+import Control.Effect.State
+import Control.Lens ((%~), (&))
+import Data.Functor (($>))
+import Data.List (foldl')
+import Data.Singletons
+import Data.Text (Text)
+import Prelude hiding (pred, succ)
 
-import qualified Command              as C
-import           Data.Fin
-import           Data.Nat
-import qualified Lexer                as L
-import qualified Normalize            as N
-import qualified Syntax               as S
-import           Zoo
+import Command qualified as C
+import Data.Fin
+import Data.Nat
+import Lexer qualified as L
+import Normalize qualified as N
+import Syntax qualified as S
+import Zoo
 
 file :: Parser L.Token Nat [C.Cmd]
 file =   pSingle L.TEOF $> []

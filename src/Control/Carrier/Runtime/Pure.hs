@@ -1,23 +1,42 @@
 module Control.Carrier.Runtime.Pure
   ( module Control.Effect.Runtime
   , RuntimePureC(..)
+  , withoutRuntime
   ) where
 
 import Control.Algebra
+import Control.Carrier.State.Strict
+import Control.Carrier.Throw.Either
+import Control.Carrier.Writer.Strict
 import Control.Effect.Runtime
 import Data.Kind (Type)
+import Data.Text (Text)
+import System.Exit (ExitCode(..))
 
 type CarrierKind = Type -> Type
 
--- TODO: make it take a Text input (representing stdin) and return a Text (representing stdout)
-
--- | drops any I/O
 newtype RuntimePureC (m :: CarrierKind) (a :: Type) = MkRuntimePureC { runRuntimePureC :: m a }
   deriving (Applicative, Functor, Monad)
 
-instance Algebra sig m => Algebra (Runtime :+: sig) (RuntimePureC m) where
+type StdIn  = [Text]
+type StdOut = Text
+
+instance (Has (State StdIn) sig m, Has (Writer StdOut) sig m, Has (Throw ExitCode) sig m) => Algebra (Runtime :+: sig) (RuntimePureC m) where
   alg hdl si ct = MkRuntimePureC case si of
-    L RExit      -> pure ct -- FIXME feels wrong
-    L RRead      -> pure ("" <$ ct)
-    L (RWrite _) -> pure ct
-    R other      -> alg (runRuntimePureC . hdl) other ct
+    L (RExit code) -> (<$ ct) <$> throwError code
+    L RRead        -> (<$ ct) <$> do
+      stdin <- get @StdIn
+      case stdin of
+        []     -> throwError $ ExitFailure 1
+        l : ls -> put ls >> pure l
+    L (RWrite t)   -> (<$ ct) <$> tell t
+    R other        -> alg (runRuntimePureC . hdl) other ct
+
+withoutRuntime :: Monad m => RuntimePureC (StateC StdIn (ThrowC ExitCode (WriterC StdOut m))) a -> m ()
+withoutRuntime
+  = fmap snd
+  . runWriter @Text
+  . fmap (const ())
+  . runThrow @ExitCode
+  . evalState @[Text] []
+  . runRuntimePureC

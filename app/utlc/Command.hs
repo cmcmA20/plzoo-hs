@@ -1,17 +1,17 @@
 module Command where
 
-import           Control.Carrier.Reader
-import           Control.Carrier.State.Strict
-import           Control.Effect.Runtime
-import           Control.Effect.Throw
-import           Control.Lens
-import           Data.Text                    (Text)
-import           GHC.Generics                 (Generic)
+import Control.Carrier.Reader
+import Control.Carrier.State.Strict
+import Control.Effect.Runtime
+import Control.Effect.Throw
+import Control.Lens
+import Data.Text (Text)
+import GHC.Generics (Generic)
 
-import qualified Context                      as Con
-import           Normalize
-import           Syntax
-import           Zoo
+import Context qualified as Con
+import Normalize
+import Syntax
+import Zoo
 
 data Cmd
   = CDefine !Text !Term
@@ -78,7 +78,7 @@ evalCmd (CDefine name value) = do
     Just _  -> throwError (LERuntime $ locate Nothing $ name <> " already exists")
 evalCmd CHelp = pure $ Left helpMessage
 evalCmd CQuit = do
-  rExit
+  rExitSuccess
   pure $ Left "bye"
 
 helpMessage :: Text

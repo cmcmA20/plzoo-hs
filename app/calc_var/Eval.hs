@@ -1,16 +1,16 @@
 -- | Evaluation of expressions
 module Eval where
 
-import           Control.Algebra
-import           Control.Carrier.State.Strict
-import           Control.Carrier.Throw.Either
-import           Control.Monad                (when)
-import           Data.HashMap.Strict          (HashMap)
-import qualified Data.HashMap.Strict          as HM
-import           Data.Text                    (Text)
+import Control.Algebra
+import Control.Carrier.State.Strict
+import Control.Carrier.Throw.Either
+import Control.Monad (when)
+import Data.HashMap.Strict (HashMap)
+import Data.HashMap.Strict qualified as HM
+import Data.Text (Text)
 
-import           Syntax
-import           Zoo
+import Syntax
+import Zoo
 
 -- | Semantics.
 type Sem = Integer

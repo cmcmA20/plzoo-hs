@@ -5,22 +5,22 @@
 -}
 module Machine where
 
-import           Control.Carrier.State.Strict
-import           Control.Carrier.Throw.Either
-import           Control.Effect.Runtime
-import           Control.Exception            (Exception)
-import           Control.Lens
-import           Control.Monad                (when)
-import           Data.IntMap.Strict           (IntMap)
-import qualified Data.IntMap.Strict           as IM
-import           Data.Text                    (Text)
-import qualified Data.Text                    as T
-import           Data.Word                    (Word16)
-import           Formatting
-import           GHC.Generics                 (Generic)
-import           Text.Read                    (readMaybe)
+import Control.Carrier.State.Strict
+import Control.Carrier.Throw.Either
+import Control.Effect.Runtime
+import Control.Exception (Exception)
+import Control.Lens
+import Control.Monad (when)
+import Data.IntMap.Strict (IntMap)
+import Data.IntMap.Strict qualified as IM
+import Data.Text (Text)
+import Data.Text qualified as T
+import Data.Word (Word16)
+import Formatting
+import GHC.Generics (Generic)
+import Text.Read (readMaybe)
 
-import           Zoo
+import Zoo
 
 -- | The machine instructions.
 data Instruction

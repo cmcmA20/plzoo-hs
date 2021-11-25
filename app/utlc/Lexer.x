@@ -1,8 +1,8 @@
 {
 module Lexer where
 
-import           Data.Text (Text)
-import qualified Data.Text as T
+import Data.Text (Text)
+import Data.Text qualified as T
 }
 
 %wrapper "monad"

@@ -1,24 +1,24 @@
 module Main where
 
-import           Control.Carrier.Lift
-import           Control.Carrier.Reader
-import           Control.Carrier.Runtime.IO
-import           Control.Carrier.State.Strict
-import           Control.Carrier.Throw.Either
-import           Control.Lens
-import           Data.Bifunctor               (first)
-import           Data.Text                    (Text)
-import qualified Data.Text                    as T
-import           Data.Word                    (Word16)
-import           GHC.Generics                 (Generic)
-import           Options.Applicative
+import Control.Carrier.Lift
+import Control.Carrier.Reader
+import Control.Carrier.Runtime.IO
+import Control.Carrier.State.Strict
+import Control.Carrier.Throw.Either
+import Control.Lens
+import Data.Bifunctor (first)
+import Data.Text (Text)
+import Data.Text qualified as T
+import Data.Word (Word16)
+import GHC.Generics (Generic)
+import Options.Applicative
 
-import qualified Compile                      as C
-import qualified Lexer                        as L
-import qualified Machine                      as M
-import qualified Parser                       as P
-import qualified Syntax                       as S
-import           Zoo
+import Compile qualified as C
+import Lexer qualified as L
+import Machine qualified as M
+import Parser qualified as P
+import Syntax qualified as S
+import Zoo
 
 data Clo = MkClo
   { ram      :: !Word16

@@ -1,7 +1,7 @@
 -- | Abstract syntax.
 module Syntax where
 
-import           Data.Text (Text)
+import Data.Text (Text)
 
 -- | Arithmetical expressions.
 data ArExp

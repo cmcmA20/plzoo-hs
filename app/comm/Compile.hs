@@ -1,14 +1,14 @@
 module Compile where
 
-import           Control.Carrier.Reader
-import           Control.Carrier.Throw.Either
-import qualified Data.IntMap                  as IM
-import           Data.Text                    (Text)
-import           Data.Word                    (Word16)
+import Control.Carrier.Reader
+import Control.Carrier.Throw.Either
+import Data.IntMap qualified as IM
+import Data.Text (Text)
+import Data.Word (Word16)
 
-import           Machine
-import           Syntax
-import           Zoo
+import Machine
+import Syntax
+import Zoo
 
 type Compiler sig m =
   ( Has (Reader [Text]) sig m

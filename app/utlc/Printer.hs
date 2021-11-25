@@ -1,12 +1,12 @@
 module Printer where
 
-import           Data.Singletons (Sing, SingI, sing, withSingI)
-import           Data.Text       (Text)
-import qualified Data.Text       as T
+import Data.Singletons (Sing, SingI, sing, withSingI)
+import Data.Text (Text)
+import Data.Text qualified as T
 
-import           Data.Fin
-import           Data.Nat
-import           Syntax
+import Data.Fin
+import Data.Nat
+import Syntax
 
 showFin :: Sing n -> Fin ('S n) -> Text
 showFin sn = T.pack . show . natToInteger . withSingI sn finToNatI

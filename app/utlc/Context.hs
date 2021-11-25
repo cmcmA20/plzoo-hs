@@ -1,15 +1,15 @@
 module Context where
 
-import           Control.Effect.Reader
-import           Control.Effect.State
-import           Control.Effect.Throw
-import           Data.HashMap.Strict   (HashMap)
-import qualified Data.HashMap.Strict   as HM
-import           Data.Text             (Text)
+import Control.Effect.Reader
+import Control.Effect.State
+import Control.Effect.Throw
+import Data.HashMap.Strict (HashMap)
+import Data.HashMap.Strict qualified as HM
+import Data.Text (Text)
 
-import           Printer
-import           Syntax
-import           Zoo
+import Printer
+import Syntax
+import Zoo
 
 data Decl = DConst | DTerm Term
   deriving Show

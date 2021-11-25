@@ -1,8 +1,8 @@
 {
 module Parser where
 
-import qualified Syntax as S
-import qualified Lexer as L
+import Syntax qualified as S
+import Lexer qualified as L
 }
 
 %name toplevel Toplevel
