@@ -20,6 +20,30 @@ library
                       , Control.Carrier.Runtime.Pure
                       , Data.Fin
                       , Data.Nat
+                      , Language.Calc.Eval
+                      , Language.Calc.Lexer
+                      , Language.Calc.Parser
+                      , Language.Calc.Syntax
+                      , Language.CalcVar.Eval
+                      , Language.CalcVar.Lexer
+                      , Language.CalcVar.Parser
+                      , Language.CalcVar.Syntax
+                      , Language.Comm.Compile
+                      , Language.Comm.Lexer
+                      , Language.Comm.Machine
+                      , Language.Comm.Parser
+                      , Language.Comm.Syntax
+                      , Language.UTLC.Command
+                      , Language.UTLC.Context
+                      , Language.UTLC.Lexer
+                      , Language.UTLC.Normalize
+                      , Language.UTLC.Parser
+                      , Language.UTLC.Printer
+                      , Language.UTLC.Syntax
+                      , Language.Tartlet.Env
+                      , Language.Tartlet.Name
+                      , Language.Tartlet.Semantics
+                      , Language.Tartlet.Syntax
                       , Zoo
   other-modules:        Zoo.Core
                       , Zoo.Debug
@@ -28,16 +52,23 @@ library
                       , Zoo.Main
                       , Zoo.Options
                       , Zoo.Parser
-  build-depends:        base >= 4.14 && <4.15
+  build-depends:        array
+                      , base >= 4.14 && <4.15
+                      , containers
+                      , formatting
                       , fused-effects >= 1.1.0.0
                       , fused-effects-exceptions
                       , generic-lens
+                      , hashable
                       , lens
                       , optparse-applicative
                       , pretty-simple
                       , singletons == 2.7
                       , text
                       , unix
+                      , unordered-containers
+  build-tool-depends:   alex:alex
+                      , happy:happy
   hs-source-dirs:       src
   default-language:     Haskell2010
   default-extensions:   AllowAmbiguousTypes
@@ -47,6 +78,7 @@ library
                       , DataKinds
                       , DeriveFunctor
                       , DeriveGeneric
+                      , DerivingVia
                       , FlexibleInstances
                       , GADTs
                       , GeneralizedNewtypeDeriving
@@ -65,134 +97,53 @@ library
                       , TypeOperators
                       , UndecidableInstances
                       , ViewPatterns
-  ghc-options:         -Wall
+  ghc-options:          -Wall
+
+test-suite plzoo-test
+  type:                 exitcode-stdio-1.0
+  main-is:              Spec.hs
+  hs-source-dirs:       test
+  build-depends:        base >=4.14 && <4.15
+                      , fused-effects
+                      , plzoo-hs
+  default-extensions:   OverloadedStrings
+  default-language:     Haskell2010
+  ghc-options:          -threaded -rtsopts -with-rtsopts=-N
+
+common common-executable
+  hs-source-dirs:       app
+  ghc-options:          -Wall
+  default-extensions:   ImportQualifiedPost
+                      , OverloadedStrings
+                      , TypeApplications
+  default-language:     Haskell2010
+  build-depends:        base >=4.14 && <4.15
+                      , fused-effects
+                      , plzoo-hs
+                      , text
 
 executable calc
-  main-is:             Main.hs
-  other-modules:       Eval
-                     , Lexer
-                     , Parser
-                     , Syntax
-  build-depends:       array
-                     , base >=4.14 && <4.15
-                     , fused-effects
-                     , lens
-                     , plzoo-hs
-                     , text
-  build-tool-depends:  alex:alex
-                     , happy:happy
-  hs-source-dirs:      app/calc
-  default-language:    Haskell2010
-  default-extensions:  ImportQualifiedPost
-                     , OverloadedStrings
-                     , TypeApplications
-  ghc-options:         -Wall
+  import:               common-executable
+  main-is:              Calc.hs
 
 executable calc_var
-  main-is:             Main.hs
-  other-modules:       Eval
-                     , Lexer
-                     , Parser
-                     , Syntax
-  build-depends:       array
-                     , base >=4.14 && <4.15
-                     , fused-effects
-                     , lens
-                     , plzoo-hs
-                     , text
-                     , unordered-containers
-  build-tool-depends:  alex:alex
-                     , happy:happy
-  hs-source-dirs:      app/calc_var
-  default-language:    Haskell2010
-  default-extensions:  ImportQualifiedPost
-                     , OverloadedStrings
-                     , TypeApplications
-  ghc-options:         -Wall
+  import:               common-executable
+  main-is:              CalcVar.hs
+  build-depends:        unordered-containers
 
 executable comm
-  main-is:             Main.hs
-  other-modules:       Compile
-                     , Lexer
-                     , Machine
-                     , Parser
-                     , Syntax
-  build-depends:       array
-                     , base >=4.14 && <4.15
-                     , containers
-                     , formatting
-                     , fused-effects
-                     , lens
-                     , optparse-applicative
-                     , plzoo-hs
-                     , text
-  build-tool-depends:  alex:alex
-                     , happy:happy
-  hs-source-dirs:      app/comm
-  default-language:    Haskell2010
-  default-extensions:  BlockArguments
-                     , ConstraintKinds
-                     , DeriveGeneric
-                     , DuplicateRecordFields
-                     , GeneralizedNewtypeDeriving
-                     , ImportQualifiedPost
-                     , OverloadedLabels
-                     , OverloadedStrings
-                     , TupleSections
-                     , TypeApplications
-  ghc-options:         -Wall
+  import:               common-executable
+  main-is:              Comm.hs
+  build-depends:        lens
+                      , optparse-applicative
+  default-extensions:   BlockArguments
+                      , DeriveGeneric
+                      , OverloadedLabels
 
 executable utlc
-  main-is:             Main.hs
-  other-modules:       Command
-                     , Context
-                     , Lexer
-                     , Normalize
-                     , Parser
-                     , Printer
-                     , Syntax
-  build-depends:       array
-                     , base >=4.14 && <4.15
-                     , fused-effects
-                     , lens
-                     , plzoo-hs
-                     , pretty-simple
-                     , singletons
-                     , text
-                     , unordered-containers
-  build-tool-depends:  alex:alex
-  hs-source-dirs:      app/utlc
-  default-language:    Haskell2010
-  default-extensions:  BlockArguments
-                     , ConstraintKinds
-                     , DataKinds
-                     , DeriveGeneric
-                     , DerivingVia
-                     , GADTs
-                     , ImportQualifiedPost
-                     , KindSignatures
-                     , OverloadedLabels
-                     , OverloadedStrings
-                     , RankNTypes
-                     , ScopedTypeVariables
-                     , StandaloneKindSignatures
-                     , TypeApplications
-  ghc-options:         -Wall
+  import:               common-executable
+  main-is:              UTLC.hs
 
 executable tartlet
-  main-is:             Main.hs
-  other-modules:       Syntax
-                     , Semantics
-  build-depends:       base >=4.14 && <4.15
-                     , fused-effects
-                     , plzoo-hs
-                     , text
-  build-tool-depends:  alex:alex
-  hs-source-dirs:      app/tartlet
-  default-language:    Haskell2010
-  default-extensions:  BlockArguments
-                     , DeriveFunctor
-                     , ImportQualifiedPost
-                     , OverloadedStrings
-                     , TypeApplications
-  ghc-options:         -Wall
+  import:               common-executable
+  main-is:              Tartlet.hs

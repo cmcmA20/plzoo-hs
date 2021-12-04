@@ -9,6 +9,7 @@ import Control.Carrier.State.Strict
 import Control.Carrier.Throw.Either
 import Control.Carrier.Writer.Strict
 import Control.Effect.Runtime
+import Control.Monad (void)
 import Data.Kind (Type)
 import Data.Text (Text)
 import System.Exit (ExitCode(..))
@@ -36,7 +37,7 @@ withoutRuntime :: Monad m => RuntimePureC (StateC StdIn (ThrowC ExitCode (Writer
 withoutRuntime
   = fmap snd
   . runWriter @Text
-  . fmap (const ())
+  . void
   . runThrow @ExitCode
   . evalState @[Text] []
   . runRuntimePureC
